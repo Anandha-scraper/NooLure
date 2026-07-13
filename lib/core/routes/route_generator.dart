@@ -42,6 +42,10 @@ class RouteGenerator {
         return _page(const BirthdaysScreen());
       case AppRoutes.addBirthday:
         return _page(const AddBirthdayScreen());
+      case AppRoutes.editBirthday:
+        return _page(
+          AddBirthdayScreen(birthdayId: settings.arguments as String),
+        );
       case AppRoutes.birthdayDetail:
         return _page(BirthdayScreen(birthdayId: settings.arguments as String));
       case AppRoutes.profile:

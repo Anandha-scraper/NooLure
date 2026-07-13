@@ -104,15 +104,28 @@ class BirthdayScreen extends StatelessWidget {
                 Positioned(
                   top: MediaQuery.paddingOf(context).top + 4,
                   right: 8,
-                  child: IconButton(
-                    icon: const Icon(LucideIcons.trash2),
-                    tooltip: 'Delete birthday',
-                    color: headerInk,
-                    onPressed: () async {
-                      final navigator = Navigator.of(context);
-                      await provider.deleteBirthday(birthday.id);
-                      navigator.pop();
-                    },
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(LucideIcons.pencil),
+                        tooltip: 'Edit birthday',
+                        color: headerInk,
+                        onPressed: () => Navigator.of(context).pushNamed(
+                          AppRoutes.editBirthday,
+                          arguments: birthday.id,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(LucideIcons.trash2),
+                        tooltip: 'Delete birthday',
+                        color: headerInk,
+                        onPressed: () async {
+                          final navigator = Navigator.of(context);
+                          await provider.deleteBirthday(birthday.id);
+                          navigator.pop();
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -175,12 +188,18 @@ class BirthdayScreen extends StatelessWidget {
                     children: [
                       for (final d in birthday.reminderDaysBefore)
                         TagChip(
+                          key: ValueKey('reminder-$d'),
                           d == 0 ? 'On the day' : '$d days before',
                           variant: TagVariant.accent,
-                          onTap: () =>
-                              provider.removeReminderDay(birthday.id, d),
+                          onTap: () => _confirmRemoveReminder(
+                            context,
+                            provider,
+                            birthday.id,
+                            d,
+                          ),
                         ),
                       TagChip(
+                        key: const ValueKey('add-custom-reminder'),
                         '+ Add custom',
                         variant: TagVariant.outline,
                         onTap: () =>
@@ -284,5 +303,37 @@ Future<void> _showAddReminderDialog(
   );
   controller.dispose();
   if (days == null || days < 0) return;
+  // Deferred a frame so the dialog's own pop transition fully settles before
+  // the provider update rebuilds the page underneath it.
+  await Future<void>.delayed(Duration.zero);
   await provider.addReminderDay(birthdayId, days);
+}
+
+Future<void> _confirmRemoveReminder(
+  BuildContext context,
+  BirthdayProvider provider,
+  String birthdayId,
+  int daysBefore,
+) async {
+  final label = daysBefore == 0 ? 'On the day' : '$daysBefore days before';
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Remove reminder?'),
+      content: Text('"$label" won\'t remind you for this birthday anymore.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Remove'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+  await Future<void>.delayed(Duration.zero);
+  await provider.removeReminderDay(birthdayId, daysBefore);
 }

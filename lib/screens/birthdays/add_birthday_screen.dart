@@ -10,22 +10,53 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
 
 class AddBirthdayScreen extends StatefulWidget {
-  const AddBirthdayScreen({super.key});
+  const AddBirthdayScreen({super.key, this.birthdayId});
+
+  final String? birthdayId;
 
   @override
   State<AddBirthdayScreen> createState() => _AddBirthdayScreenState();
 }
 
 class _AddBirthdayScreenState extends State<AddBirthdayScreen> {
-  final _nameController = TextEditingController();
-  final _relationController = TextEditingController(text: 'Friend');
-  final _notesController = TextEditingController();
+  late final TextEditingController _nameController;
+  late final TextEditingController _relationController;
+  late final TextEditingController _notesController;
 
   DateTime? _birthDate;
 
   /// Whether the picked date's year is meaningful. Plenty of people know the
   /// day but not the year, so the year is stored separately and optionally.
   bool _knowsYear = true;
+
+  bool get _isEditing => widget.birthdayId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.birthdayId == null
+        ? null
+        : context.read<BirthdayProvider>().byId(widget.birthdayId!);
+    _nameController = TextEditingController(text: existing?.name ?? '');
+    _relationController = TextEditingController(
+      text: existing?.relation ?? 'Friend',
+    );
+    _notesController = TextEditingController(text: existing?.notes ?? '');
+    if (existing != null) {
+      final now = DateTime.now();
+      // A known birthYear is always <= now (it came from this same picker,
+      // capped at lastDate: now). For an unknown year, fall back to a
+      // placeholder that's guaranteed to be in the past regardless of
+      // month/day, matching _pickDate's own fallback below — using the
+      // current year here could land after `now` and crash showDatePicker.
+      _birthDate = DateTime(
+        existing.birthYear ?? (now.year - 30),
+        existing.month,
+        existing.day,
+      );
+      _knowsYear = existing.birthYear != null;
+    }
+  }
 
   @override
   void dispose() {
@@ -42,7 +73,7 @@ class _AddBirthdayScreenState extends State<AddBirthdayScreen> {
     final date = _birthDate;
 
     return AppScaffold(
-      title: 'New birthday',
+      title: _isEditing ? 'Edit birthday' : 'New birthday',
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
@@ -127,7 +158,7 @@ class _AddBirthdayScreenState extends State<AddBirthdayScreen> {
           ListenableBuilder(
             listenable: _nameController,
             builder: (context, _) => PrimaryButton(
-              label: 'Add birthday',
+              label: _isEditing ? 'Save changes' : 'Add birthday',
               onPressed:
                   _nameController.text.trim().isEmpty || _birthDate == null
                   ? null
@@ -157,16 +188,36 @@ class _AddBirthdayScreenState extends State<AddBirthdayScreen> {
     if (date == null) return;
 
     final navigator = Navigator.of(context);
-    await context.read<BirthdayProvider>().addBirthday(
-      name: _nameController.text.trim(),
-      relation: _relationController.text.trim().isEmpty
-          ? 'Friend'
-          : _relationController.text.trim(),
-      month: date.month,
-      day: date.day,
-      birthYear: _knowsYear ? date.year : null,
-      notes: _notesController.text.trim(),
-    );
+    final relation = _relationController.text.trim().isEmpty
+        ? 'Friend'
+        : _relationController.text.trim();
+
+    if (_isEditing) {
+      final provider = context.read<BirthdayProvider>();
+      final existing = provider.byId(widget.birthdayId!);
+      if (existing != null) {
+        await provider.updateBirthday(
+          existing.copyWith(
+            name: _nameController.text.trim(),
+            relation: relation,
+            month: date.month,
+            day: date.day,
+            birthYear: _knowsYear ? date.year : null,
+            clearBirthYear: !_knowsYear,
+            notes: _notesController.text.trim(),
+          ),
+        );
+      }
+    } else {
+      await context.read<BirthdayProvider>().addBirthday(
+        name: _nameController.text.trim(),
+        relation: relation,
+        month: date.month,
+        day: date.day,
+        birthYear: _knowsYear ? date.year : null,
+        notes: _notesController.text.trim(),
+      );
+    }
     navigator.pop();
   }
 }
