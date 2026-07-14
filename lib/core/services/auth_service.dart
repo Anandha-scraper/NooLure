@@ -5,16 +5,25 @@ import '../../models/user_model.dart';
 import '../utils/date_labels.dart';
 
 /// Real Google Sign-In + Firebase Auth backend. Relies on Android's
-/// `google-services.json` for OAuth client config — as long as Google Sign-In
-/// was enabled for this Firebase project (which auto-creates the required web
-/// OAuth client), no client ID needs to be passed here.
+/// `google-services.json` for the Android OAuth client (matched by package
+/// name + signing certificate), but the Web client id below must still be
+/// passed explicitly — see [_serverClientId].
 class AuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   bool _initialized = false;
 
+  // The "Web client (auto created by Google Service)" id from
+  // google-services.json's client_type: 3 entry. Unlike the legacy
+  // google_sign_in API, the Credential Manager-based v7 API doesn't
+  // auto-detect this from google-services.json on Android — omitting it
+  // throws GoogleSignInExceptionCode.clientConfigurationError
+  // ("serverClientId must be provided on Android") on every sign-in attempt.
+  static const _serverClientId =
+      '429362243986-jfk698b540vkopr0bgp7q8b4u8nd31cs.apps.googleusercontent.com';
+
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
-    await _googleSignIn.initialize();
+    await _googleSignIn.initialize(serverClientId: _serverClientId);
     _initialized = true;
   }
 
