@@ -5,9 +5,12 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/text_styles.dart';
+import '../../models/task_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../widgets/app_scaffold.dart';
+import '../../widgets/confirm_delete_dialog.dart';
+import '../../widgets/confirm_done_dialog.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/tag_chip.dart';
 import '../../widgets/task_preview_sheet.dart';
@@ -21,12 +24,24 @@ class TaskScreen extends StatefulWidget {
 }
 
 class _TaskScreenState extends State<TaskScreen> {
+  bool _celebrationDismissed = false;
+  bool _wasAllDone = false;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final provider = context.watch<TaskProvider>();
     final onSurface = theme.colorScheme.onSurface;
     final all = provider.filteredTasks;
+    final openTasks = all.where((t) => !t.done).toList();
+    final completedTasks = all.where((t) => t.done).toList();
+
+    // Re-arm the celebration each time it's freshly earned, rather than only
+    // ever showing it once per app session.
+    if (provider.allDone && !_wasAllDone) {
+      _celebrationDismissed = false;
+    }
+    _wasAllDone = provider.allDone;
     // Fixed defaults plus whatever categories the user has actually typed in
     // — a hardcoded 'Errands'/'Urgent' chip that no task uses is just noise.
     final extraCategories =
@@ -41,6 +56,16 @@ class _TaskScreenState extends State<TaskScreen> {
     return AppScaffold(
       title: 'Tasks',
       drawerRoute: AppRoutes.tasks,
+      actions: provider.allDone && !_celebrationDismissed
+          ? [
+              IconButton(
+                icon: const Icon(LucideIcons.x),
+                tooltip: 'Dismiss',
+                onPressed: () => setState(() => _celebrationDismissed = true),
+              ),
+              const SizedBox(width: 8),
+            ]
+          : null,
       titleStyle: TextStyles.h2(color: onSurface),
       floatingActionButton: AppFab(
         onPressed: () => Navigator.of(context).pushNamed(AppRoutes.addTask),
@@ -91,58 +116,9 @@ class _TaskScreenState extends State<TaskScreen> {
                     ),
                   ),
                 ),
-              for (final task in all)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Dismissible(
-                    key: ValueKey(task.id),
-                    background: _swipeBackground(
-                      alignment: Alignment.centerLeft,
-                      color: AppColors.softFill(
-                        AppColors.accent2,
-                        theme.brightness,
-                      ),
-                      icon: LucideIcons.check,
-                      iconColor: AppColors.softInk(
-                        AppColors.accent2,
-                        theme.brightness,
-                      ),
-                    ),
-                    secondaryBackground: _swipeBackground(
-                      alignment: Alignment.centerRight,
-                      color: theme.colorScheme.error.withValues(alpha: 0.15),
-                      icon: LucideIcons.trash2,
-                      iconColor: theme.colorScheme.error,
-                    ),
-                    confirmDismiss: (direction) async {
-                      if (direction == DismissDirection.startToEnd) {
-                        provider.toggleDone(task.id);
-                        return false;
-                      }
-                      return true;
-                    },
-                    onDismissed: (_) => provider.deleteTask(task.id),
-                    child: TaskTile(
-                      task: task,
-                      showDragHandle: true,
-                      onToggle: () => provider.toggleDone(task.id),
-                      onTap: () => showTaskPreview(
-                        context,
-                        task,
-                        onEdit: () => Navigator.of(context).pushNamed(
-                          AppRoutes.taskDetail,
-                          arguments: task.id,
-                        ),
-                        onToggleDone: () => provider.toggleDone(task.id),
-                      ),
-                      onLongPress: () => Navigator.of(context).pushNamed(
-                        AppRoutes.taskDetail,
-                        arguments: task.id,
-                      ),
-                    ),
-                  ),
-                ),
-              if (all.isNotEmpty) ...[
+              for (final task in openTasks)
+                _taskRow(context, theme, provider, task, allowComplete: true),
+              if (openTasks.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -164,10 +140,97 @@ class _TaskScreenState extends State<TaskScreen> {
                   ],
                 ),
               ],
+              if (completedTasks.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                Text(
+                  'Completed (${completedTasks.length})',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                for (final task in completedTasks)
+                  _taskRow(
+                    context,
+                    theme,
+                    provider,
+                    task,
+                    allowComplete: false,
+                  ),
+              ],
             ],
           ),
-          if (provider.allDone) const _CelebrationOverlay(),
+          if (provider.allDone && !_celebrationDismissed)
+            const _CelebrationOverlay(),
         ],
+      ),
+    );
+  }
+
+  /// A single swipeable, tappable task row — shared by the open and
+  /// completed sections. [allowComplete] gates the complete-swipe direction
+  /// entirely (via [Dismissible.direction], not just hiding a background),
+  /// since a completed task has nothing left to confirm-complete into.
+  Widget _taskRow(
+    BuildContext context,
+    ThemeData theme,
+    TaskProvider provider,
+    TaskModel task, {
+    required bool allowComplete,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Dismissible(
+        key: ValueKey(task.id),
+        direction: allowComplete
+            ? DismissDirection.horizontal
+            : DismissDirection.endToStart,
+        background: _swipeBackground(
+          alignment: Alignment.centerLeft,
+          color: AppColors.softFill(AppColors.accent2, theme.brightness),
+          icon: LucideIcons.check,
+          iconColor: AppColors.softInk(AppColors.accent2, theme.brightness),
+        ),
+        secondaryBackground: _swipeBackground(
+          alignment: Alignment.centerRight,
+          color: theme.colorScheme.error.withValues(alpha: 0.15),
+          icon: LucideIcons.trash2,
+          iconColor: theme.colorScheme.error,
+        ),
+        confirmDismiss: (direction) async {
+          if (direction == DismissDirection.startToEnd) {
+            await confirmDoneTask(
+              context,
+              title: task.title,
+              onConfirm: () => provider.toggleDone(task.id),
+            );
+          } else {
+            await confirmDeleteTask(
+              context,
+              title: task.title,
+              onConfirm: () => provider.deleteTask(task.id),
+            );
+          }
+          return false;
+        },
+        child: TaskTile(
+          task: task,
+          showDragHandle: true,
+          onToggle: () => provider.toggleDone(task.id),
+          onTap: () => showTaskPreview(
+            context,
+            task,
+            onEdit: () => Navigator.of(
+              context,
+            ).pushNamed(AppRoutes.taskDetail, arguments: task.id),
+            onToggleDone: () => provider.toggleDone(task.id),
+          ),
+          onLongPress: () => Navigator.of(
+            context,
+          ).pushNamed(AppRoutes.taskDetail, arguments: task.id),
+        ),
       ),
     );
   }

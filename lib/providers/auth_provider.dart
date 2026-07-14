@@ -20,14 +20,18 @@ class AuthProvider extends ChangeNotifier {
 
   AuthStatus status = AuthStatus.unknown;
   UserModel? currentUser;
+  String? errorMessage;
 
   Future<void> _restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
     final signedIn = prefs.getBool(_sessionKey) ?? false;
-    if (signedIn) {
-      var user = await _authService.signInWithGoogle();
-      // A name edited in Profile is a local override of whatever the identity
-      // provider reports, so it has to outlive the session.
+    // A passive local lookup, not the interactive Google Sign-In flow — this
+    // is what makes "stay logged in" actually mean once, not every launch.
+    final cachedUser = signedIn ? _authService.currentCachedUser() : null;
+    if (cachedUser != null) {
+      var user = cachedUser;
+      // A name edited in Profile is a local override of whatever the
+      // identity provider reports, so it has to outlive the session.
       final savedName = prefs.getString(_displayNameKey);
       if (savedName != null && savedName.isNotEmpty) {
         user = user.copyWith(name: savedName);
@@ -36,6 +40,12 @@ class AuthProvider extends ChangeNotifier {
       await SyncService.instance.bind(user.id);
       status = AuthStatus.authenticated;
     } else {
+      if (signedIn) {
+        // Our flag says signed in, but Firebase has no cached session —
+        // a real reinstall or cleared app storage. Drop the stale flag so
+        // this doesn't loop; the user gets exactly one real sign-in prompt.
+        await prefs.setBool(_sessionKey, false);
+      }
       status = AuthStatus.unauthenticated;
     }
     notifyListeners();
@@ -43,19 +53,34 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> signInWithGoogle() async {
     status = AuthStatus.authenticating;
+    errorMessage = null;
     notifyListeners();
 
-    final user = await _authService.signInWithGoogle();
-    currentUser = user;
+    try {
+      final user = await _authService.signInWithGoogle();
+      currentUser = user;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_sessionKey, true);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_sessionKey, true);
 
-    // No-op unless a Firebase config is present; local data is already usable.
-    await SyncService.instance.bind(user.id);
+      // No-op unless a Firebase config is present; local data is already usable.
+      await SyncService.instance.bind(user.id);
 
-    status = AuthStatus.authenticated;
+      status = AuthStatus.authenticated;
+    } catch (e) {
+      // Without this, any failure (dialog cancelled, no cached Google
+      // credential, network hiccup) leaves `status` stuck at
+      // `authenticating` forever — AuthGate shows a spinner with no way
+      // back to the login button, so a retry is impossible.
+      debugPrint('Google sign-in failed: $e');
+      status = AuthStatus.unauthenticated;
+      errorMessage = 'Sign-in failed. Please try again.';
+    }
     notifyListeners();
+  }
+
+  void clearError() {
+    errorMessage = null;
   }
 
   Future<void> updateName(String name) async {

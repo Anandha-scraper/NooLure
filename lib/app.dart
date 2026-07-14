@@ -10,6 +10,7 @@ import 'providers/task_provider.dart';
 import 'providers/theme_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/splash_screen.dart';
 
 class NooLureApp extends StatelessWidget {
   const NooLureApp({super.key});
@@ -53,9 +54,8 @@ class AuthGate extends StatelessWidget {
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
         return switch (auth.status) {
-          AuthStatus.unknown || AuthStatus.authenticating => const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          ),
+          AuthStatus.unknown ||
+          AuthStatus.authenticating => const SplashScreen(),
           AuthStatus.unauthenticated => const LoginScreen(),
           AuthStatus.authenticated => const HomeScreen(),
         };

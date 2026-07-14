@@ -12,7 +12,7 @@ class TaskTile extends StatelessWidget {
   const TaskTile({
     super.key,
     required this.task,
-    required this.onToggle,
+    this.onToggle,
     this.onTap,
     this.onLongPress,
     this.dense = false,
@@ -20,7 +20,7 @@ class TaskTile extends StatelessWidget {
   });
 
   final TaskModel task;
-  final VoidCallback onToggle;
+  final VoidCallback? onToggle;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final bool dense;

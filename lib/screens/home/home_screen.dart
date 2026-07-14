@@ -13,9 +13,11 @@ import '../../providers/task_provider.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/avatar_circle.dart';
 import '../../widgets/card_container.dart';
+import '../../widgets/confirm_done_dialog.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/segmented_control.dart';
+import '../../widgets/task_preview_sheet.dart';
 import '../../widgets/task_tile.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -179,20 +181,22 @@ class HomeScreen extends StatelessWidget {
                     ),
                     confirmDismiss: (direction) async {
                       if (direction == DismissDirection.startToEnd) {
-                        await _confirmDoneTask(context, tasks, task.id, task.title);
+                        await confirmDoneTask(
+                          context,
+                          title: task.title,
+                          onConfirm: () => tasks.toggleDone(task.id),
+                        );
                       } else {
-                        await Navigator.of(context).pushNamed(
-                          AppRoutes.taskDetail,
-                          arguments: task.id,
+                        await showTaskPreview(
+                          context,
+                          task,
+                          onEdit: null,
+                          onToggleDone: () => tasks.toggleDone(task.id),
                         );
                       }
                       return false;
                     },
-                    child: TaskTile(
-                      task: task,
-                      dense: true,
-                      onToggle: () => tasks.toggleDone(task.id),
-                    ),
+                    child: TaskTile(task: task, dense: true),
                   ),
                 ),
           ],
@@ -213,33 +217,6 @@ Widget _swipeBackground({
     padding: const EdgeInsets.symmetric(horizontal: 24),
     decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(32)),
     child: Icon(icon, color: iconColor),
-  );
-}
-
-Future<void> _confirmDoneTask(
-  BuildContext context,
-  TaskProvider tasks,
-  String taskId,
-  String title,
-) async {
-  await showDialog<void>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text('Done task "$title"?'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () async {
-            await tasks.toggleDone(taskId);
-            if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-          },
-          child: const Text('Yes'),
-        ),
-      ],
-    ),
   );
 }
 
