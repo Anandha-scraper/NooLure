@@ -74,7 +74,13 @@ class AuthProvider extends ChangeNotifier {
       // back to the login button, so a retry is impossible.
       debugPrint('Google sign-in failed: $e');
       status = AuthStatus.unauthenticated;
-      errorMessage = 'Sign-in failed. Please try again.';
+      // In release builds testers only ever see this snackbar, with no way
+      // to relay a stack trace — so in debug/profile builds the raw error
+      // (e.g. an ApiException: 10 SHA-1 mismatch) rides along in the
+      // message instead of disappearing into debugPrint alone.
+      errorMessage = kReleaseMode
+          ? 'Sign-in failed. Please try again.'
+          : 'Sign-in failed: $e';
     }
     notifyListeners();
   }
