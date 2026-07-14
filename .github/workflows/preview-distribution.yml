@@ -72,14 +72,22 @@ jobs:
       - name: Write key.properties for Gradle release signing
         # build.gradle.kts reads android/key.properties if present and wires
         # up signingConfigs.release from it; falls back to the debug key
-        # locally where this file never exists.
+        # locally where this file never exists. Secrets come in via `env:`
+        # (never re-interpolated as `${{ }}` inside the script body) and get
+        # every backslash doubled before writing, because Properties.load()
+        # treats `\` as an escape char and would otherwise silently mangle
+        # any password that happens to contain one.
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          cat > android/key.properties <<'KEYPROPS_EOF'
-          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-          storeFile=release-keystore.jks
-          KEYPROPS_EOF
+          {
+            printf 'storePassword=%s\n' "${STORE_PASSWORD//\\/\\\\}"
+            printf 'keyPassword=%s\n' "${KEY_PASSWORD//\\/\\\\}"
+            printf 'keyAlias=%s\n' "${KEY_ALIAS//\\/\\\\}"
+            printf 'storeFile=%s\n' "release-keystore.jks"
+          } > android/key.properties
 
       - name: Build signed release APK
         # --build-number overrides versionCode for just this build without
@@ -94,9 +102,14 @@ jobs:
 
       - name: Authenticate firebase-tools with the service account
         # firebase-tools picks up GOOGLE_APPLICATION_CREDENTIALS automatically
-        # for non-interactive auth — no `firebase login` needed in CI.
+        # for non-interactive auth — no `firebase login` needed in CI. Secret
+        # comes in via `env:` and is written with `printf '%s'` rather than
+        # re-interpolated as `${{ }}` inside a quoted `echo` — a literal `'`
+        # in the JSON would otherwise break out of the quoting.
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/firebase-service-account.json"
+          printf '%s' "$SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
 
       - name: Verify the service account file is valid, complete JSON
@@ -126,21 +139,23 @@ jobs:
         # Wipes every existing release for this app so only the build we're
         # about to upload remains. Non-fatal on purpose: if firebase-tools
         # ever changes this command's JSON shape, we warn instead of blocking
-        # the actual distribution below — but we now surface the real CLI
-        # error text (previously swallowed via 2>/dev/null) so a genuine
-        # auth/permissions problem is visible instead of a generic warning.
+        # the actual distribution below. stdout and stderr are captured
+        # SEPARATELY (not merged via 2>&1) — jq only ever sees clean stdout,
+        # so routine stderr chatter (e.g. Node deprecation warnings) can't
+        # break JSON parsing and silently skip cleanup on an otherwise-
+        # successful list; stderr is only used in the failure-path warning.
         env:
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
         run: |
           set +e
-          RELEASES_OUTPUT=$(firebase appdistribution:releases:list --app "$FIREBASE_APP_ID" --json 2>&1)
-          RELEASES_JSON=$(echo "$RELEASES_OUTPUT" | jq -e . 2>/dev/null)
-          if [ -n "$RELEASES_JSON" ]; then
+          RELEASES_JSON=$(firebase appdistribution:releases:list --app "$FIREBASE_APP_ID" --json 2>"$RUNNER_TEMP/releases-list.err")
+          RELEASES_ERR=$(cat "$RUNNER_TEMP/releases-list.err")
+          if echo "$RELEASES_JSON" | jq -e . >/dev/null 2>&1; then
             echo "$RELEASES_JSON" | jq -r '(.result // .releases // [])[]?.name // empty' | while read -r RELEASE_NAME; do
               [ -n "$RELEASE_NAME" ] && firebase appdistribution:releases:delete "$RELEASE_NAME" --app "$FIREBASE_APP_ID" --force
             done
           else
-            echo "::warning::Could not list existing Firebase releases — skipping cleanup, new release will still be uploaded. Raw CLI output: $RELEASES_OUTPUT"
+            echo "::warning::Could not list existing Firebase releases — skipping cleanup, new release will still be uploaded. CLI stderr: $RELEASES_ERR"
           fi
           set -e
 

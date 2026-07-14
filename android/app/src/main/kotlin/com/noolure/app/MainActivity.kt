@@ -1,4 +1,4 @@
-package com.noolure.app.noolure
+package com.noolure.app
 
 import io.flutter.embedding.android.FlutterActivity
 
