@@ -18,6 +18,22 @@ class AuthService {
     _initialized = true;
   }
 
+  /// Passive, local-only lookup — no network call, no account picker.
+  /// Firebase Auth persists the signed-in user across app restarts on its
+  /// own, independent of Google Sign-In's own session, so app launch should
+  /// read this instead of re-running the interactive [signInWithGoogle].
+  UserModel? currentCachedUser() {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+    final name = user.displayName ?? '';
+    return UserModel(
+      id: user.uid,
+      name: name,
+      email: user.email ?? '',
+      initials: DateLabels.initialsOf(name),
+    );
+  }
+
   Future<UserModel> signInWithGoogle() async {
     await _ensureInitialized();
 

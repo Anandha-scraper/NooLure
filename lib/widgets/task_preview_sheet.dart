@@ -8,10 +8,12 @@ import 'tag_chip.dart';
 
 /// Read-only glance at a task — shown on tap, with an "Edit" affordance for
 /// anyone who doesn't know (or doesn't want to use) the long-press shortcut.
+/// Pass `onEdit: null` to omit that affordance entirely (e.g. Home, where
+/// editing is only reachable from the Tasks page).
 Future<void> showTaskPreview(
   BuildContext context,
   TaskModel task, {
-  required VoidCallback onEdit,
+  required VoidCallback? onEdit,
   required VoidCallback onToggleDone,
 }) {
   return showModalBottomSheet<void>(
@@ -19,10 +21,12 @@ Future<void> showTaskPreview(
     isScrollControlled: true,
     builder: (sheetContext) => _TaskPreviewSheet(
       task: task,
-      onEdit: () {
-        Navigator.of(sheetContext).pop();
-        onEdit();
-      },
+      onEdit: onEdit == null
+          ? null
+          : () {
+              Navigator.of(sheetContext).pop();
+              onEdit();
+            },
       onToggleDone: onToggleDone,
     ),
   );
@@ -36,7 +40,7 @@ class _TaskPreviewSheet extends StatelessWidget {
   });
 
   final TaskModel task;
-  final VoidCallback onEdit;
+  final VoidCallback? onEdit;
   final VoidCallback onToggleDone;
 
   @override
@@ -90,15 +94,17 @@ class _TaskPreviewSheet extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 20),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: TextButton.icon(
-                onPressed: onEdit,
-                icon: const Icon(LucideIcons.pencil, size: 16),
-                label: const Text('Edit'),
+            if (onEdit != null) ...[
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.bottomRight,
+                child: TextButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(LucideIcons.pencil, size: 16),
+                  label: const Text('Edit'),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

@@ -57,7 +57,7 @@ class LoginScreen extends StatelessWidget {
                                 height: 200,
                                 padding: const EdgeInsets.all(36),
                                 decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
+                                  borderRadius: BorderRadius.circular(32),
                                   gradient: LinearGradient(
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
@@ -72,7 +72,7 @@ class LoginScreen extends StatelessWidget {
                                   boxShadow: AppColors.shadowLg(brightness),
                                 ),
                                 child: Image.asset(
-                                  'assets/images/noolure_logo.png',
+                                  'assets/icons/appicon_square.png',
                                 ),
                               ),
                             ],
@@ -98,15 +98,34 @@ class LoginScreen extends StatelessWidget {
                           Column(
                             children: [
                               Consumer<AuthProvider>(
-                                builder: (context, auth, _) => PrimaryButton(
-                                  label: 'Continue with Google',
-                                  height: 52,
-                                  leading: const GoogleLettermark(),
-                                  onPressed:
-                                      auth.status == AuthStatus.authenticating
-                                      ? null
-                                      : () => auth.signInWithGoogle(),
-                                ),
+                                builder: (context, auth, _) {
+                                  if (auth.errorMessage != null) {
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                auth.errorMessage!,
+                                              ),
+                                            ),
+                                          );
+                                          auth.clearError();
+                                        });
+                                  }
+                                  return PrimaryButton(
+                                    label: 'Continue with Google',
+                                    height: 52,
+                                    leading: const GoogleLettermark(),
+                                    onPressed:
+                                        auth.status ==
+                                            AuthStatus.authenticating
+                                        ? null
+                                        : () => auth.signInWithGoogle(),
+                                  );
+                                },
                               ),
                               const SizedBox(height: 14),
                               Text(
