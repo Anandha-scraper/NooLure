@@ -99,23 +99,48 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/firebase-service-account.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
 
+      - name: Verify the service account file is valid, complete JSON
+        # Diagnostic only — catches a mis-pasted FIREBASE_SERVICE_ACCOUNT
+        # secret (truncated, wrapped in extra quotes, accidentally base64'd,
+        # etc.) with a clear error instead of the opaque "Failed to
+        # authenticate" firebase-tools throws further down the job. Never
+        # prints private_key.
+        run: |
+          python3 -c "
+          import json, sys
+          path = '$RUNNER_TEMP/firebase-service-account.json'
+          try:
+              data = json.load(open(path))
+          except Exception as e:
+              print(f'::error::Service account file is not valid JSON ({e}). Re-check the FIREBASE_SERVICE_ACCOUNT secret was pasted as the raw, complete file contents.')
+              sys.exit(1)
+          required = ['type', 'project_id', 'private_key', 'client_email']
+          missing = [k for k in required if not data.get(k)]
+          if missing:
+              print(f'::error::Service account JSON is missing fields: {missing}')
+              sys.exit(1)
+          print(f'Service account OK — type={data[\"type\"]!r}, project_id={data[\"project_id\"]!r}, client_email={data[\"client_email\"][:10]}...redacted')
+          "
+
       - name: Delete previous Firebase App Distribution releases
         # Wipes every existing release for this app so only the build we're
         # about to upload remains. Non-fatal on purpose: if firebase-tools
         # ever changes this command's JSON shape, we warn instead of blocking
-        # the actual distribution below. Re-check against
-        # `firebase appdistribution:releases:list --help` if this ever warns.
+        # the actual distribution below — but we now surface the real CLI
+        # error text (previously swallowed via 2>/dev/null) so a genuine
+        # auth/permissions problem is visible instead of a generic warning.
         env:
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
         run: |
           set +e
-          RELEASES_JSON=$(firebase appdistribution:releases:list --app "$FIREBASE_APP_ID" --json 2>/dev/null)
+          RELEASES_OUTPUT=$(firebase appdistribution:releases:list --app "$FIREBASE_APP_ID" --json 2>&1)
+          RELEASES_JSON=$(echo "$RELEASES_OUTPUT" | jq -e . 2>/dev/null)
           if [ -n "$RELEASES_JSON" ]; then
             echo "$RELEASES_JSON" | jq -r '(.result // .releases // [])[]?.name // empty' | while read -r RELEASE_NAME; do
               [ -n "$RELEASE_NAME" ] && firebase appdistribution:releases:delete "$RELEASE_NAME" --app "$FIREBASE_APP_ID" --force
             done
           else
-            echo "::warning::Could not list existing Firebase releases (empty/unexpected CLI output) — skipping cleanup, new release will still be uploaded."
+            echo "::warning::Could not list existing Firebase releases — skipping cleanup, new release will still be uploaded. Raw CLI output: $RELEASES_OUTPUT"
           fi
           set -e
 
