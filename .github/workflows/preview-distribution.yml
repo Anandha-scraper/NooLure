@@ -1,0 +1,146 @@
+name: Preview Distribution
+
+# Only ever runs on pushes to "preview" — never main, never PRs, never tags.
+# This is a branch allowlist, not a filter: no other branch can trigger it.
+on:
+  push:
+    branches:
+      - preview
+
+# Least-privilege default; this workflow only needs to read the repo.
+permissions:
+  contents: read
+
+env:
+  # Not a secret — group names aren't sensitive. Hardcoded here so it's easy
+  # to spot/change without touching GitHub Secrets.
+  FIREBASE_TESTER_GROUP: "Preview"
+
+jobs:
+  build-and-distribute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify applicationId is a valid reverse-domain identifier
+        # Guards against the exact bug this project had (com.Noolure.com):
+        # uppercase letters and/or a bare TLD repeated as the last segment.
+        # Fails the build loudly instead of silently shipping a bad ID.
+        run: |
+          APP_ID=$(grep -oP '(?<=applicationId = ")[^"]+' android/app/build.gradle.kts)
+          echo "Detected applicationId: $APP_ID"
+          if ! echo "$APP_ID" | grep -qP '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'; then
+            echo "::error::applicationId '$APP_ID' is not a valid lowercase reverse-domain identifier (e.g. com.noolure.app)."
+            exit 1
+          fi
+          FIRST_SEGMENT=$(echo "$APP_ID" | awk -F. '{print $1}')
+          LAST_SEGMENT=$(echo "$APP_ID" | awk -F. '{print $NF}')
+          if echo "$LAST_SEGMENT" | grep -qP '^(com|net|org|io|gov|edu)$' && [ "$FIRST_SEGMENT" = "$LAST_SEGMENT" ]; then
+            echo "::error::applicationId '$APP_ID' repeats its TLD as the last segment (e.g. com.foo.com) — pick a real reverse-domain identifier."
+            exit 1
+          fi
+          echo "applicationId format OK."
+
+      - name: Set up JDK 17
+        # Matches compileOptions/jvmTarget = VERSION_17/JVM_17 in app/build.gradle.kts.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Dart/Flutter dependencies
+        run: flutter pub get
+
+      - name: Decode Firebase config (google-services.json) from secret
+        # google-services.json is gitignored on purpose (per-developer file),
+        # so CI has to materialize it itself from a base64 secret.
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > android/app/google-services.json
+
+      - name: Decode release keystore from secret
+        # Also gitignored; decoded fresh into the workspace on every run and
+        # never persisted anywhere outside this ephemeral runner.
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release-keystore.jks
+
+      - name: Write key.properties for Gradle release signing
+        # build.gradle.kts reads android/key.properties if present and wires
+        # up signingConfigs.release from it; falls back to the debug key
+        # locally where this file never exists.
+        run: |
+          cat > android/key.properties <<'KEYPROPS_EOF'
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=release-keystore.jks
+          KEYPROPS_EOF
+
+      - name: Build signed release APK
+        # --build-number overrides versionCode for just this build without
+        # touching pubspec.yaml; github.run_number always increases, so every
+        # build looks newer to the Play/Firebase installer than the last.
+        run: flutter build apk --release --build-number=${{ github.run_number }}
+
+      - name: Install firebase-tools
+        # Pinned to a major version so a future firebase-tools release can't
+        # silently change CLI flags/output shape out from under this workflow.
+        run: npm install -g firebase-tools@13
+
+      - name: Authenticate firebase-tools with the service account
+        # firebase-tools picks up GOOGLE_APPLICATION_CREDENTIALS automatically
+        # for non-interactive auth — no `firebase login` needed in CI.
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/firebase-service-account.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+
+      - name: Delete previous Firebase App Distribution releases
+        # Wipes every existing release for this app so only the build we're
+        # about to upload remains. Non-fatal on purpose: if firebase-tools
+        # ever changes this command's JSON shape, we warn instead of blocking
+        # the actual distribution below. Re-check against
+        # `firebase appdistribution:releases:list --help` if this ever warns.
+        env:
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+        run: |
+          set +e
+          RELEASES_JSON=$(firebase appdistribution:releases:list --app "$FIREBASE_APP_ID" --json 2>/dev/null)
+          if [ -n "$RELEASES_JSON" ]; then
+            echo "$RELEASES_JSON" | jq -r '(.result // .releases // [])[]?.name // empty' | while read -r RELEASE_NAME; do
+              [ -n "$RELEASE_NAME" ] && firebase appdistribution:releases:delete "$RELEASE_NAME" --app "$FIREBASE_APP_ID" --force
+            done
+          else
+            echo "::warning::Could not list existing Firebase releases (empty/unexpected CLI output) — skipping cleanup, new release will still be uploaded."
+          fi
+          set -e
+
+      - name: Build release notes (commit message + short SHA)
+        # COMMIT_MESSAGE is passed via `env:`, never interpolated directly
+        # into the script body — it comes from the pushed commit, so treating
+        # it as untrusted input avoids a script-injection hole.
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          DELIM="RELEASE_NOTES_EOF_$(date +%s%N)"
+          {
+            echo "RELEASE_NOTES<<$DELIM"
+            printf '%s (%s)\n' "$COMMIT_MESSAGE" "$SHORT_SHA"
+            echo "$DELIM"
+          } >> "$GITHUB_ENV"
+
+      - name: Distribute to Firebase App Distribution
+        # Uploads the APK and emails/links every member of FIREBASE_TESTER_GROUP.
+        env:
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+          RELEASE_NOTES: ${{ env.RELEASE_NOTES }}
+        run: |
+          firebase appdistribution:distribute \
+            build/app/outputs/flutter-apk/app-release.apk \
+            --app "$FIREBASE_APP_ID" \
+            --release-notes "$RELEASE_NOTES" \
+            --groups "$FIREBASE_TESTER_GROUP"
