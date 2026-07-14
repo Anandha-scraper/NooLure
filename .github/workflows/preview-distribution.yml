@@ -12,9 +12,10 @@ permissions:
   contents: read
 
 env:
-  # Not a secret — group names aren't sensitive. Hardcoded here so it's easy
-  # to spot/change without touching GitHub Secrets.
-  FIREBASE_TESTER_GROUP: "Preview"
+  # This is the group ALIAS (lowercase, shown next to the display name in the
+  # Firebase console), not the display name — the CLI's --groups flag needs
+  # the alias. Not a secret, so hardcoded here for easy editing.
+  FIREBASE_TESTER_GROUP: "preview"
 
 jobs:
   build-and-distribute:
