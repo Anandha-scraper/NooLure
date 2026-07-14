@@ -19,7 +19,6 @@ class _DrawerItem {
 const _drawerItems = [
   _DrawerItem(LucideIcons.house, 'Home', AppRoutes.home),
   _DrawerItem(LucideIcons.checkSquare, 'Tasks', AppRoutes.tasks),
-  _DrawerItem(LucideIcons.calendar, 'Calendar', AppRoutes.calendar),
   _DrawerItem(LucideIcons.notebook, 'Notes', AppRoutes.notes),
   _DrawerItem(LucideIcons.cake, 'Birthdays', AppRoutes.birthdays),
 ];

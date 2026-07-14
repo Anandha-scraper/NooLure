@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/text_styles.dart';
+import '../../core/utils/date_labels.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/birthday_provider.dart';
 import '../../providers/note_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -34,14 +36,33 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().currentUser;
     final themeProvider = context.watch<ThemeProvider>();
-    final doneTasks = context.watch<TaskProvider>().doneCount;
+    final tasks = context.watch<TaskProvider>().tasks;
     final noteCount = context.watch<NoteProvider>().notes.length;
+    final birthdayCount = context.watch<BirthdayProvider>().birthdays.length;
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
     final accentInk = AppColors.accentInk(
       theme.colorScheme.primary,
       theme.brightness,
     );
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final weekStart = today.subtract(Duration(days: now.weekday - 1));
+    final weekEnd = weekStart.add(const Duration(days: 7));
+    final dueToday = tasks
+        .where((t) => t.dueAt != null && DateLabels.isSameDay(t.dueAt!, now))
+        .toList();
+    final dueWeek = tasks
+        .where(
+          (t) =>
+              t.dueAt != null &&
+              !t.dueAt!.isBefore(weekStart) &&
+              t.dueAt!.isBefore(weekEnd),
+        )
+        .toList();
+    final doneToday = dueToday.where((t) => t.done).length;
+    final doneWeek = dueWeek.where((t) => t.done).length;
 
     return AppScaffold(
       title: 'Profile',
@@ -91,9 +112,9 @@ class ProfileScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: _StatColumn(
-                    icon: LucideIcons.flame,
-                    value: '18',
-                    label: 'day streak',
+                    icon: LucideIcons.cake,
+                    value: '$birthdayCount',
+                    label: 'birthdays',
                   ),
                 ),
                 SizedBox(
@@ -101,10 +122,11 @@ class ProfileScreen extends StatelessWidget {
                   child: VerticalDivider(width: 1, color: theme.dividerColor),
                 ),
                 Expanded(
-                  child: _StatColumn(
-                    icon: LucideIcons.checkCheck,
-                    value: '$doneTasks',
-                    label: 'tasks done',
+                  child: _TaskProgressColumn(
+                    doneToday: doneToday,
+                    dueToday: dueToday.length,
+                    doneWeek: doneWeek,
+                    dueWeek: dueWeek.length,
                   ),
                 ),
                 SizedBox(
@@ -139,7 +161,6 @@ class ProfileScreen extends StatelessWidget {
                   options: const [
                     (ThemeMode.light, 'Light'),
                     (ThemeMode.dark, 'Dark'),
-                    (ThemeMode.system, 'System'),
                   ],
                 ),
                 const SizedBox(height: 14),
@@ -214,10 +235,43 @@ class ProfileScreen extends StatelessWidget {
               await context.read<AuthProvider>().signOut();
             },
           ),
+          const SizedBox(height: 10),
+          SecondaryButton(
+            label: 'Delete account',
+            height: 46,
+            leading: const Icon(LucideIcons.trash2, size: 16),
+            onPressed: () => _confirmDeleteAccount(context),
+          ),
         ],
       ),
     );
   }
+}
+
+Future<void> _confirmDeleteAccount(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Delete account?'),
+      content: const Text(
+        "This permanently deletes your account and all data. This can't be undone.",
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  // AuthGate reacts to the status change exactly like it does for sign-out.
+  Navigator.of(context).popUntil((route) => route.isFirst);
+  await context.read<AuthProvider>().deleteAccount();
 }
 
 class _StatColumn extends StatelessWidget {
@@ -248,6 +302,49 @@ class _StatColumn extends StatelessWidget {
         Text(value, style: TextStyles.h4(color: onSurface)),
         Text(
           label,
+          style: TextStyle(
+            fontSize: 10.5,
+            color: onSurface.withValues(alpha: 0.55),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Center stat column — today's and this week's (Mon–Sun) task-completion
+/// ratios, replacing a single "tasks done" running total.
+class _TaskProgressColumn extends StatelessWidget {
+  const _TaskProgressColumn({
+    required this.doneToday,
+    required this.dueToday,
+    required this.doneWeek,
+    required this.dueWeek,
+  });
+
+  final int doneToday;
+  final int dueToday;
+  final int doneWeek;
+  final int dueWeek;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    return Column(
+      children: [
+        Icon(
+          LucideIcons.checkCheck,
+          size: 18,
+          color: AppColors.accentInk(
+            theme.colorScheme.primary,
+            theme.brightness,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text('$doneToday/$dueToday', style: TextStyles.h4(color: onSurface)),
+        Text(
+          '$doneWeek/$dueWeek this wk',
           style: TextStyle(
             fontSize: 10.5,
             color: onSurface.withValues(alpha: 0.55),

@@ -43,4 +43,26 @@ class AuthService {
     await _googleSignIn.signOut();
     await firebase_auth.FirebaseAuth.instance.signOut();
   }
+
+  /// Permanently deletes the Firebase Auth user. Account deletion is a
+  /// sensitive operation Firebase only allows on a *recent* sign-in — if the
+  /// session has aged out, silently re-run the Google sign-in flow to get a
+  /// fresh credential and retry once before giving up.
+  Future<void> deleteAccount() async {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      await user.delete();
+    } on firebase_auth.FirebaseAuthException catch (error) {
+      if (error.code != 'requires-recent-login') rethrow;
+      await _ensureInitialized();
+      final account = await _googleSignIn.authenticate();
+      final credential = firebase_auth.GoogleAuthProvider.credential(
+        idToken: account.authentication.idToken,
+      );
+      await user.reauthenticateWithCredential(credential);
+      await user.delete();
+    }
+    await _googleSignIn.signOut();
+  }
 }

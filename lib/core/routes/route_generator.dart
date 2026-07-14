@@ -4,7 +4,6 @@ import '../../screens/auth/login_screen.dart';
 import '../../screens/birthdays/add_birthday_screen.dart';
 import '../../screens/birthdays/birthday_screen.dart';
 import '../../screens/birthdays/birthdays_screen.dart';
-import '../../screens/calendar/calendar_screen.dart';
 import '../../screens/home/home_screen.dart';
 import '../../screens/notes/add_note_screen.dart';
 import '../../screens/notes/notes_screen.dart';
@@ -30,8 +29,6 @@ class RouteGenerator {
         return _page(EditTaskScreen(taskId: settings.arguments as String));
       case AppRoutes.addTask:
         return _page(const AddTaskScreen());
-      case AppRoutes.calendar:
-        return _page(const CalendarScreen());
       case AppRoutes.notes:
         return _page(const NotesScreen());
       case AppRoutes.addNote:

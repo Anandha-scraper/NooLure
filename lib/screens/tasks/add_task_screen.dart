@@ -20,7 +20,8 @@ class AddTaskScreen extends StatefulWidget {
 
 class _AddTaskScreenState extends State<AddTaskScreen> {
   final _titleController = TextEditingController();
-  final _categoryController = TextEditingController(text: 'Personal');
+  final _categoryController = TextEditingController(text: 'Work');
+  final _descriptionController = TextEditingController();
 
   /// Null means "someday" — a task with no date, rather than the old free-text
   /// time field that got stored verbatim and never meant anything.
@@ -32,6 +33,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   void dispose() {
     _titleController.dispose();
     _categoryController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -80,6 +82,17 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             value: _repeat,
             onChanged: (v) => setState(() => _repeat = v),
           ),
+          const SizedBox(height: 18),
+          Text(
+            'Description',
+            style: TextStyles.sectionLabel(color: onSurface),
+          ),
+          const SizedBox(height: 8),
+          CustomTextField(
+            controller: _descriptionController,
+            hintText: 'Add a description (optional)',
+            maxLines: 3,
+          ),
           const SizedBox(height: 30),
           ListenableBuilder(
             listenable: _titleController,
@@ -107,6 +120,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       dueAt: _dueAt,
       priority: _priority,
       category: category.isEmpty ? 'General' : category,
+      description: _descriptionController.text.trim(),
       repeat: _repeat,
     );
     navigator.pop();

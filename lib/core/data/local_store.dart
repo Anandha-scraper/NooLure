@@ -13,14 +13,8 @@ class LocalStore {
   static const String tasks = 'tasks';
   static const String notes = 'notes';
   static const String birthdays = 'birthdays';
-  static const String calendarEvents = 'calendarEvents';
 
-  static const List<String> collections = [
-    tasks,
-    notes,
-    birthdays,
-    calendarEvents,
-  ];
+  static const List<String> collections = [tasks, notes, birthdays];
 
   static Future<void> init() async {
     await Hive.initFlutter();
@@ -28,4 +22,11 @@ class LocalStore {
   }
 
   static Box<String> box(String collection) => Hive.box<String>(collection);
+
+  /// Wipes every local collection — used when a user deletes their account.
+  static Future<void> clearAll() async {
+    for (final collection in collections) {
+      await box(collection).clear();
+    }
+  }
 }

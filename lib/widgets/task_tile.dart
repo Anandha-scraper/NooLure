@@ -14,6 +14,7 @@ class TaskTile extends StatelessWidget {
     required this.task,
     required this.onToggle,
     this.onTap,
+    this.onLongPress,
     this.dense = false,
     this.showDragHandle = false,
   });
@@ -21,6 +22,7 @@ class TaskTile extends StatelessWidget {
   final TaskModel task;
   final VoidCallback onToggle;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final bool dense;
   final bool showDragHandle;
 
@@ -42,6 +44,7 @@ class TaskTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(32),
         child: InkWell(
           onTap: onTap,
+          onLongPress: onLongPress,
           borderRadius: BorderRadius.circular(32),
           child: Padding(
             padding: EdgeInsets.symmetric(

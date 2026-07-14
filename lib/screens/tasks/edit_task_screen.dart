@@ -13,8 +13,8 @@ import '../../widgets/tag_input_field.dart';
 import '../../widgets/task_form_fields.dart';
 
 /// Task detail / edit screen — a single read+edit view: title, due date,
-/// priority, category and repeat are all editable, subtasks are checkable,
-/// and a completed task can be reopened (with any edited fields applied) via
+/// priority, category, description and repeat are all editable, and a
+/// completed task can be reopened (with any edited fields applied) via
 /// "Reopen & Save".
 class EditTaskScreen extends StatefulWidget {
   const EditTaskScreen({super.key, required this.taskId});
@@ -28,6 +28,7 @@ class EditTaskScreen extends StatefulWidget {
 class _EditTaskScreenState extends State<EditTaskScreen> {
   late final TextEditingController _titleController;
   late final TextEditingController _categoryController;
+  late final TextEditingController _descriptionController;
   DateTime? _dueAt;
   bool _clearDueAt = false;
   late TaskPriority _priority;
@@ -40,6 +41,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     _seeded = true;
     _titleController = TextEditingController(text: task.title);
     _categoryController = TextEditingController(text: task.category);
+    _descriptionController = TextEditingController(text: task.description);
     _dueAt = task.dueAt;
     _priority = task.priority;
     _repeat = task.repeat;
@@ -51,6 +53,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     if (_seeded) {
       _titleController.dispose();
       _categoryController.dispose();
+      _descriptionController.dispose();
     }
     super.dispose();
   }
@@ -152,48 +155,16 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                   onChanged: (v) => setState(() => _repeat = v),
                 ),
                 const SizedBox(height: 18),
-                Divider(color: Theme.of(context).dividerColor),
-                const SizedBox(height: 18),
                 Text(
-                  'Subtasks',
+                  'Description',
                   style: TextStyles.sectionLabel(color: onSurface),
                 ),
-                const SizedBox(height: 12),
-                if (task.subtasks.isEmpty)
-                  Text(
-                    'No subtasks',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: onSurface.withValues(alpha: 0.5),
-                    ),
-                  ),
-                for (final subtask in task.subtasks)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: GestureDetector(
-                      onTap: () => provider.toggleSubtask(task.id, subtask.id),
-                      child: Row(
-                        children: [
-                          CheckCircle(checked: subtask.done, size: 18),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              subtask.title,
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                color: onSurface.withValues(
-                                  alpha: subtask.done ? 0.55 : 1,
-                                ),
-                                decoration: subtask.done
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                const SizedBox(height: 8),
+                CustomTextField(
+                  controller: _descriptionController,
+                  hintText: 'Add a description (optional)',
+                  maxLines: 3,
+                ),
               ],
             ),
           ),
@@ -238,6 +209,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
         clearDueAt: _clearDueAt,
         priority: _priority,
         category: category.isEmpty ? 'General' : category,
+        description: _descriptionController.text.trim(),
         repeat: _repeat,
         done: _done,
       ),

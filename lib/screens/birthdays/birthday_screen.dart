@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/text_styles.dart';
+import '../../models/birthday_model.dart';
 import '../../providers/birthday_provider.dart';
 import '../../widgets/avatar_circle.dart';
 import '../../widgets/tag_chip.dart';
@@ -47,9 +48,12 @@ class BirthdayScreen extends StatelessWidget {
             Stack(
               children: [
                 Container(
-                  height: 280,
-                  padding: EdgeInsets.only(
-                    top: MediaQuery.paddingOf(context).top + 54,
+                  width: double.infinity,
+                  padding: EdgeInsets.fromLTRB(
+                    0,
+                    MediaQuery.paddingOf(context).top + 54,
+                    0,
+                    28,
                   ),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -121,8 +125,12 @@ class BirthdayScreen extends StatelessWidget {
                         color: headerInk,
                         onPressed: () async {
                           final navigator = Navigator.of(context);
-                          await provider.deleteBirthday(birthday.id);
-                          navigator.pop();
+                          final deleted = await _confirmDeleteBirthday(
+                            context,
+                            provider,
+                            birthday,
+                          );
+                          if (deleted) navigator.pop();
                         },
                       ),
                     ],
@@ -270,13 +278,44 @@ class BirthdayScreen extends StatelessWidget {
   }
 }
 
+Future<bool> _confirmDeleteBirthday(
+  BuildContext context,
+  BirthdayProvider provider,
+  BirthdayModel birthday,
+) async {
+  final deleted = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Delete birthday?'),
+      content: Text(
+        'This removes "${birthday.name}" and all of its reminders. '
+        "This can't be undone.",
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () async {
+            await provider.deleteBirthday(birthday.id);
+            if (dialogContext.mounted) Navigator.of(dialogContext).pop(true);
+          },
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  return deleted ?? false;
+}
+
 Future<void> _showAddReminderDialog(
   BuildContext context,
   BirthdayProvider provider,
   String birthdayId,
 ) async {
   final controller = TextEditingController();
-  final days = await showDialog<int>(
+  await showDialog<void>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: const Text('Add custom reminder'),
@@ -294,19 +333,23 @@ Future<void> _showAddReminderDialog(
           child: const Text('Cancel'),
         ),
         TextButton(
-          onPressed: () =>
-              Navigator.of(dialogContext).pop(int.tryParse(controller.text)),
+          onPressed: () async {
+            final days = int.tryParse(controller.text);
+            // Mutate the provider (and let its rebuild happen) *before*
+            // popping — popping first and mutating after races the dialog
+            // route's own exit transition and trips a framework assertion
+            // (`_dependents.isEmpty`) when the screen rebuilds mid-teardown.
+            if (days != null && days >= 0) {
+              await provider.addReminderDay(birthdayId, days);
+            }
+            if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+          },
           child: const Text('Add'),
         ),
       ],
     ),
   );
   controller.dispose();
-  if (days == null || days < 0) return;
-  // Deferred a frame so the dialog's own pop transition fully settles before
-  // the provider update rebuilds the page underneath it.
-  await Future<void>.delayed(Duration.zero);
-  await provider.addReminderDay(birthdayId, days);
 }
 
 Future<void> _confirmRemoveReminder(
@@ -316,24 +359,24 @@ Future<void> _confirmRemoveReminder(
   int daysBefore,
 ) async {
   final label = daysBefore == 0 ? 'On the day' : '$daysBefore days before';
-  final confirmed = await showDialog<bool>(
+  await showDialog<void>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: const Text('Remove reminder?'),
       content: Text('"$label" won\'t remind you for this birthday anymore.'),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(false),
+          onPressed: () => Navigator.of(dialogContext).pop(),
           child: const Text('Cancel'),
         ),
         TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(true),
+          onPressed: () async {
+            await provider.removeReminderDay(birthdayId, daysBefore);
+            if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+          },
           child: const Text('Remove'),
         ),
       ],
     ),
   );
-  if (confirmed != true) return;
-  await Future<void>.delayed(Duration.zero);
-  await provider.removeReminderDay(birthdayId, daysBefore);
 }

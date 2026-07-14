@@ -38,29 +38,6 @@ extension TaskRepeatLabel on TaskRepeat {
   };
 }
 
-class SubtaskModel {
-  const SubtaskModel({
-    required this.id,
-    required this.title,
-    this.done = false,
-  });
-
-  final String id;
-  final String title;
-  final bool done;
-
-  SubtaskModel copyWith({String? title, bool? done}) =>
-      SubtaskModel(id: id, title: title ?? this.title, done: done ?? this.done);
-
-  Map<String, dynamic> toJson() => {'id': id, 'title': title, 'done': done};
-
-  factory SubtaskModel.fromJson(Map<String, dynamic> json) => SubtaskModel(
-    id: json['id'] as String,
-    title: (json['title'] as String?) ?? '',
-    done: (json['done'] as bool?) ?? false,
-  );
-}
-
 class TaskModel {
   const TaskModel({
     required this.id,
@@ -71,7 +48,7 @@ class TaskModel {
     required this.updatedAt,
     this.dueAt,
     this.done = false,
-    this.subtasks = const [],
+    this.description = '',
     this.repeat = TaskRepeat.none,
   });
 
@@ -83,7 +60,7 @@ class TaskModel {
   final TaskPriority priority;
   final String category;
   final bool done;
-  final List<SubtaskModel> subtasks;
+  final String description;
   final TaskRepeat repeat;
   final DateTime createdAt;
 
@@ -110,7 +87,7 @@ class TaskModel {
     TaskPriority? priority,
     String? category,
     bool? done,
-    List<SubtaskModel>? subtasks,
+    String? description,
     TaskRepeat? repeat,
     DateTime? updatedAt,
   }) => TaskModel(
@@ -120,7 +97,7 @@ class TaskModel {
     priority: priority ?? this.priority,
     category: category ?? this.category,
     done: done ?? this.done,
-    subtasks: subtasks ?? this.subtasks,
+    description: description ?? this.description,
     repeat: repeat ?? this.repeat,
     createdAt: createdAt,
     updatedAt: updatedAt ?? DateTime.now(),
@@ -133,8 +110,8 @@ class TaskModel {
     'priority': priority.label,
     'category': category,
     'done': done,
+    'description': description,
     'repeat': repeat.label,
-    'subtasks': subtasks.map((s) => s.toJson()).toList(),
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
   };
@@ -148,11 +125,8 @@ class TaskModel {
       priority: TaskPriorityLabel.fromLabel(json['priority'] as String?),
       category: (json['category'] as String?) ?? 'General',
       done: (json['done'] as bool?) ?? false,
+      description: (json['description'] as String?) ?? '',
       repeat: TaskRepeatLabel.fromLabel(json['repeat'] as String?),
-      subtasks: [
-        for (final s in (json['subtasks'] as List<dynamic>? ?? []))
-          SubtaskModel.fromJson(Map<String, dynamic>.from(s as Map)),
-      ],
       createdAt: created,
       updatedAt: _parseDate(json['updatedAt']) ?? created,
     );

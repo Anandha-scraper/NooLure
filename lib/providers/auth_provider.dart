@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/data/local_store.dart';
 import '../core/data/sync_service.dart';
 import '../core/services/auth_service.dart';
 import '../models/user_model.dart';
@@ -73,6 +74,27 @@ class AuthProvider extends ChangeNotifier {
     await SyncService.instance.unbind();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_sessionKey, false);
+    currentUser = null;
+    status = AuthStatus.unauthenticated;
+    notifyListeners();
+  }
+
+  /// Permanently deletes the account and all of its data — remote mirror
+  /// first (while still authenticated enough for the `auth.uid === $uid`
+  /// rule to allow it), then local, then the identity itself.
+  Future<void> deleteAccount() async {
+    final user = currentUser;
+    if (user == null) return;
+
+    await SyncService.instance.deleteRemoteUserData(user.id);
+    await LocalStore.clearAll();
+    await _authService.deleteAccount();
+    await SyncService.instance.unbind();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_sessionKey, false);
+    await prefs.remove(_displayNameKey);
+
     currentUser = null;
     status = AuthStatus.unauthenticated;
     notifyListeners();

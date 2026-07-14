@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -7,15 +5,13 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/text_styles.dart';
-import '../../models/task_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/tag_chip.dart';
+import '../../widgets/task_preview_sheet.dart';
 import '../../widgets/task_tile.dart';
-
-const _filters = ['All', 'Work', 'Personal', 'Errands', 'Urgent'];
 
 class TaskScreen extends StatefulWidget {
   const TaskScreen({super.key});
@@ -25,45 +21,22 @@ class TaskScreen extends StatefulWidget {
 }
 
 class _TaskScreenState extends State<TaskScreen> {
-  String? _justCompletedId;
-  Timer? _highlightTimer;
-  bool _completedExpanded = false;
-
-  @override
-  void dispose() {
-    _highlightTimer?.cancel();
-    super.dispose();
-  }
-
-  void _onToggle(TaskProvider provider, TaskModel task) {
-    final completing = !task.done;
-    provider.toggleDone(task.id);
-    if (!completing) {
-      if (_justCompletedId == task.id) {
-        setState(() => _justCompletedId = null);
-      }
-      return;
-    }
-    _highlightTimer?.cancel();
-    setState(() => _justCompletedId = task.id);
-    _highlightTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _justCompletedId = null);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final provider = context.watch<TaskProvider>();
     final onSurface = theme.colorScheme.onSurface;
-    final accentInk = AppColors.accentInk(
-      theme.colorScheme.primary,
-      theme.brightness,
-    );
     final all = provider.filteredTasks;
-    final active = all.where((t) => !t.done).toList();
-    final completed = all.where((t) => t.done).toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    // Fixed defaults plus whatever categories the user has actually typed in
+    // — a hardcoded 'Errands'/'Urgent' chip that no task uses is just noise.
+    final extraCategories =
+        provider.tasks
+            .map((t) => t.category)
+            .where((c) => c.isNotEmpty && c != 'Work' && c != 'Personal')
+            .toSet()
+            .toList()
+          ..sort();
+    final filters = ['All', 'Work', 'Personal', ...extraCategories];
 
     return AppScaffold(
       title: 'Tasks',
@@ -89,10 +62,10 @@ class _TaskScreenState extends State<TaskScreen> {
                 height: 30,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  itemCount: _filters.length,
+                  itemCount: filters.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, i) {
-                    final f = _filters[i];
+                    final f = filters[i];
                     return TagChip(
                       f,
                       variant: f == provider.selectedFilter
@@ -101,33 +74,6 @@ class _TaskScreenState extends State<TaskScreen> {
                       onTap: () => provider.setFilter(f),
                     );
                   },
-                ),
-              ),
-              const SizedBox(height: 18),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.cardTheme.color,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.sparkles, size: 16, color: accentInk),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Try "Call mom Friday 3pm"',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ),
-                    Icon(LucideIcons.mic, size: 18, color: accentInk),
-                  ],
                 ),
               ),
               const SizedBox(height: 18),
@@ -145,7 +91,7 @@ class _TaskScreenState extends State<TaskScreen> {
                     ),
                   ),
                 ),
-              for (final task in active)
+              for (final task in all)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Dismissible(
@@ -170,27 +116,33 @@ class _TaskScreenState extends State<TaskScreen> {
                     ),
                     confirmDismiss: (direction) async {
                       if (direction == DismissDirection.startToEnd) {
-                        _onToggle(provider, task);
+                        provider.toggleDone(task.id);
                         return false;
                       }
                       return true;
                     },
                     onDismissed: (_) => provider.deleteTask(task.id),
-                    child: _HighlightableTile(
-                      highlighted: task.id == _justCompletedId,
-                      child: TaskTile(
-                        task: task,
-                        showDragHandle: true,
-                        onToggle: () => _onToggle(provider, task),
-                        onTap: () => Navigator.of(context).pushNamed(
+                    child: TaskTile(
+                      task: task,
+                      showDragHandle: true,
+                      onToggle: () => provider.toggleDone(task.id),
+                      onTap: () => showTaskPreview(
+                        context,
+                        task,
+                        onEdit: () => Navigator.of(context).pushNamed(
                           AppRoutes.taskDetail,
                           arguments: task.id,
                         ),
+                        onToggleDone: () => provider.toggleDone(task.id),
+                      ),
+                      onLongPress: () => Navigator.of(context).pushNamed(
+                        AppRoutes.taskDetail,
+                        arguments: task.id,
                       ),
                     ),
                   ),
                 ),
-              if (active.isNotEmpty) ...[
+              if (all.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -211,52 +163,6 @@ class _TaskScreenState extends State<TaskScreen> {
                     ),
                   ],
                 ),
-              ],
-              if (completed.isNotEmpty) ...[
-                const SizedBox(height: 18),
-                InkWell(
-                  onTap: () =>
-                      setState(() => _completedExpanded = !_completedExpanded),
-                  borderRadius: BorderRadius.circular(999),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _completedExpanded
-                              ? LucideIcons.chevronDown
-                              : LucideIcons.chevronRight,
-                          size: 16,
-                          color: onSurface.withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Completed (${completed.length})',
-                          style: TextStyles.sectionLabel(
-                            color: onSurface.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (_completedExpanded)
-                  for (final task in completed)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: _HighlightableTile(
-                        highlighted: task.id == _justCompletedId,
-                        child: TaskTile(
-                          task: task,
-                          showDragHandle: true,
-                          onToggle: () => _onToggle(provider, task),
-                          onTap: () => Navigator.of(context).pushNamed(
-                            AppRoutes.taskDetail,
-                            arguments: task.id,
-                          ),
-                        ),
-                      ),
-                    ),
               ],
             ],
           ),
@@ -280,31 +186,6 @@ class _TaskScreenState extends State<TaskScreen> {
         borderRadius: BorderRadius.circular(32),
       ),
       child: Icon(icon, color: iconColor),
-    );
-  }
-}
-
-/// Briefly tints a task tile right as it's completed, so the transition into
-/// the Completed section doesn't feel abrupt.
-class _HighlightableTile extends StatelessWidget {
-  const _HighlightableTile({required this.highlighted, required this.child});
-
-  final bool highlighted;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      decoration: BoxDecoration(
-        color: highlighted
-            ? AppColors.softFill(AppColors.accent2, theme.brightness)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(32),
-      ),
-      padding: const EdgeInsets.all(2),
-      child: child,
     );
   }
 }

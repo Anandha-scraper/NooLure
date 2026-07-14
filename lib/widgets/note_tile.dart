@@ -9,18 +9,11 @@ import 'tag_chip.dart';
 
 /// Regular note card shown in the 2-column grid.
 class NoteTile extends StatelessWidget {
-  const NoteTile({
-    super.key,
-    required this.note,
-    this.onTap,
-    this.onDelete,
-    this.onTogglePin,
-  });
+  const NoteTile({super.key, required this.note, this.onTap, this.onLongPress});
 
   final NoteModel note;
   final VoidCallback? onTap;
-  final VoidCallback? onDelete;
-  final VoidCallback? onTogglePin;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -28,9 +21,7 @@ class NoteTile extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      onLongPress: onDelete == null && onTogglePin == null
-          ? null
-          : () => _showActions(context),
+      onLongPress: onLongPress,
       child: CardContainer(
         elevation: CardElevation.sm,
         child: Column(
@@ -85,37 +76,6 @@ class NoteTile extends StatelessWidget {
       ),
     );
   }
-
-  void _showActions(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (onTogglePin != null)
-              ListTile(
-                leading: const Icon(LucideIcons.pin),
-                title: Text(note.isPinned ? 'Unpin note' : 'Pin note'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  onTogglePin!();
-                },
-              ),
-            if (onDelete != null)
-              ListTile(
-                leading: const Icon(LucideIcons.trash2),
-                title: const Text('Delete note'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  onDelete!();
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// The pinned "sticky note" highlight card with a mini checklist preview.
@@ -128,16 +88,19 @@ class PinnedNoteCard extends StatelessWidget {
     required this.note,
     required this.onToggleItem,
     this.onTap,
+    this.onLongPress,
   });
 
   final NoteModel note;
   final ValueChanged<String> onToggleItem;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: CardContainer(
         color: AppColors.highlight,
         child: Column(

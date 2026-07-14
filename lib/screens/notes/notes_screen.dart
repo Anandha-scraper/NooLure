@@ -7,6 +7,7 @@ import '../../core/theme/text_styles.dart';
 import '../../providers/note_provider.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/note_preview_sheet.dart';
 import '../../widgets/note_tile.dart';
 import '../../widgets/tag_chip.dart';
 
@@ -89,7 +90,16 @@ class _NotesScreenState extends State<NotesScreen> {
                 note: pinned,
                 onToggleItem: (itemId) =>
                     provider.toggleChecklistItem(pinned.id, itemId),
-                onTap: () => Navigator.of(
+                onTap: () => showNotePreview(
+                  context,
+                  pinned,
+                  onEdit: () => Navigator.of(
+                    context,
+                  ).pushNamed(AppRoutes.editNote, arguments: pinned.id),
+                  onTogglePin: () => provider.togglePinned(pinned.id),
+                  onDelete: () => provider.deleteNote(pinned.id),
+                ),
+                onLongPress: () => Navigator.of(
                   context,
                 ).pushNamed(AppRoutes.editNote, arguments: pinned.id),
               ),
@@ -118,9 +128,16 @@ class _NotesScreenState extends State<NotesScreen> {
             ),
             itemBuilder: (context, i) => NoteTile(
               note: grid[i],
-              onDelete: () => provider.deleteNote(grid[i].id),
-              onTogglePin: () => provider.togglePinned(grid[i].id),
-              onTap: () => Navigator.of(
+              onTap: () => showNotePreview(
+                context,
+                grid[i],
+                onEdit: () => Navigator.of(
+                  context,
+                ).pushNamed(AppRoutes.editNote, arguments: grid[i].id),
+                onTogglePin: () => provider.togglePinned(grid[i].id),
+                onDelete: () => provider.deleteNote(grid[i].id),
+              ),
+              onLongPress: () => Navigator.of(
                 context,
               ).pushNamed(AppRoutes.editNote, arguments: grid[i].id),
             ),

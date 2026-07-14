@@ -62,24 +62,12 @@ class TaskProvider extends ChangeNotifier {
     await _repository.save(task.copyWith(done: !task.done));
   }
 
-  Future<void> toggleSubtask(String taskId, String subtaskId) async {
-    final task = byId(taskId);
-    if (task == null) return;
-    await _repository.save(
-      task.copyWith(
-        subtasks: [
-          for (final s in task.subtasks)
-            s.id == subtaskId ? s.copyWith(done: !s.done) : s,
-        ],
-      ),
-    );
-  }
-
   Future<void> addTask({
     required String title,
     required TaskPriority priority,
     required String category,
     DateTime? dueAt,
+    String description = '',
     TaskRepeat repeat = TaskRepeat.none,
   }) async {
     final now = DateTime.now();
@@ -90,6 +78,7 @@ class TaskProvider extends ChangeNotifier {
         dueAt: dueAt,
         priority: priority,
         category: category,
+        description: description,
         repeat: repeat,
         createdAt: now,
         updatedAt: now,

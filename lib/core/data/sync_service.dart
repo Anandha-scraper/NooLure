@@ -125,6 +125,12 @@ class SyncService {
     await _collectionRef(collection)?.child(id).remove();
   }
 
+  /// Wipes everything this user has mirrored to the server — used when a
+  /// user deletes their account.
+  Future<void> deleteRemoteUserData(String userId) async {
+    await _root?.child('users').child(userId).remove();
+  }
+
   DatabaseReference? _collectionRef(String collection) {
     final root = _root;
     final userId = _userId;
