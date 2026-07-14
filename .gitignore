@@ -67,3 +67,15 @@ firebase-debug.log
 
 # Generated launcher icons intermediate
 assets/icons/.generated/
+
+# CI/CD secret material — never commit these, whatever directory they end up in.
+# (Signing keystore + key.properties are also covered under android/.gitignore,
+# repeated here in case anything is ever generated/copied to repo root.)
+*.jks
+*.keystore
+key.properties
+*-b64.txt
+*.b64
+*firebase-adminsdk*.json
+*service-account*.json
+serviceAccountKey.json
