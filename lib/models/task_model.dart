@@ -50,6 +50,7 @@ class TaskModel {
     this.done = false,
     this.description = '',
     this.repeat = TaskRepeat.none,
+    this.deletedAt,
   });
 
   final String id;
@@ -66,6 +67,11 @@ class TaskModel {
 
   /// Drives last-write-wins when a remote copy comes back from sync.
   final DateTime updatedAt;
+
+  /// Non-null when the task has been moved to trash.
+  final DateTime? deletedAt;
+
+  bool get isDeleted => deletedAt != null;
 
   /// 'Today' / 'Tomorrow' / 'Fri, Mar 3', recomputed on every build.
   String get dateLabel =>
@@ -90,6 +96,8 @@ class TaskModel {
     String? description,
     TaskRepeat? repeat,
     DateTime? updatedAt,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
   }) => TaskModel(
     id: id,
     title: title ?? this.title,
@@ -101,6 +109,7 @@ class TaskModel {
     repeat: repeat ?? this.repeat,
     createdAt: createdAt,
     updatedAt: updatedAt ?? DateTime.now(),
+    deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
   );
 
   Map<String, dynamic> toJson() => {
@@ -114,6 +123,7 @@ class TaskModel {
     'repeat': repeat.label,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
+    'deletedAt': deletedAt?.toIso8601String(),
   };
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
@@ -129,6 +139,7 @@ class TaskModel {
       repeat: TaskRepeatLabel.fromLabel(json['repeat'] as String?),
       createdAt: created,
       updatedAt: _parseDate(json['updatedAt']) ?? created,
+      deletedAt: _parseDate(json['deletedAt']),
     );
   }
 }

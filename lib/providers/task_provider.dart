@@ -11,7 +11,9 @@ class TaskProvider extends ChangeNotifier {
   TaskProvider({Repository<TaskModel>? repository})
     : _repository = repository ?? Repositories.tasks {
     _subscription = _repository.watch().listen((tasks) {
-      _tasks = tasks..sort(_byDueThenCreated);
+      _allTasks = tasks;
+      _tasks = tasks.where((t) => !t.isDeleted).toList()
+        ..sort(_byDueThenCreated);
       notifyListeners();
     });
   }
@@ -20,6 +22,7 @@ class TaskProvider extends ChangeNotifier {
   static const _uuid = Uuid();
 
   StreamSubscription<List<TaskModel>>? _subscription;
+  List<TaskModel> _allTasks = [];
   List<TaskModel> _tasks = [];
   String selectedFilter = 'All';
 
@@ -88,7 +91,44 @@ class TaskProvider extends ChangeNotifier {
 
   Future<void> updateTask(TaskModel task) => _repository.save(task);
 
-  Future<void> deleteTask(String id) => _repository.delete(id);
+  List<TaskModel> get trashedTasks {
+    final trashed = _allTasks.where((t) => t.isDeleted).toList();
+    trashed.sort((a, b) => b.deletedAt!.compareTo(a.deletedAt!));
+    return trashed;
+  }
+
+  int get trashCount => _allTasks.where((t) => t.isDeleted).length;
+
+  Future<void> trashTask(String id) async {
+    final task = _findInAll(id);
+    if (task == null) return;
+    await _repository.save(task.copyWith(deletedAt: DateTime.now()));
+  }
+
+  Future<void> restoreTask(String id) async {
+    final task = _findInAll(id);
+    if (task == null) return;
+    var restored = task.copyWith(clearDeletedAt: true);
+    if (restored.dueAt != null && restored.dueAt!.isBefore(DateTime.now())) {
+      restored = restored.copyWith(dueAt: DateTime.now());
+    }
+    await _repository.save(restored);
+  }
+
+  Future<void> permanentlyDeleteTask(String id) => _repository.delete(id);
+
+  Future<void> emptyTrash() async {
+    for (final t in trashedTasks) {
+      await _repository.delete(t.id);
+    }
+  }
+
+  TaskModel? _findInAll(String id) {
+    for (final t in _allTasks) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
 
   /// Undated tasks sink to the bottom; otherwise soonest first, then newest.
   static int _byDueThenCreated(TaskModel a, TaskModel b) {

@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 
-/// Confirms deleting a task before actually doing it — mirrors
-/// [confirmDoneTask]'s pattern so completing and deleting feel consistent.
 Future<void> confirmDeleteTask(
   BuildContext context, {
   required String title,
   required VoidCallback onConfirm,
+  bool permanent = false,
 }) async {
   await showDialog<void>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: Text('Delete task "$title"?'),
+      title: Text(
+        permanent
+            ? 'Permanently delete "$title"?'
+            : 'Move "$title" to trash?',
+      ),
+      content: permanent ? const Text('This cannot be undone.') : null,
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(),
@@ -21,7 +25,7 @@ Future<void> confirmDeleteTask(
             onConfirm();
             Navigator.of(dialogContext).pop();
           },
-          child: const Text('Delete'),
+          child: Text(permanent ? 'Delete forever' : 'Move to trash'),
         ),
       ],
     ),
