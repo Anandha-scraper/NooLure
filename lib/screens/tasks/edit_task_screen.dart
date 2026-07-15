@@ -189,7 +189,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                     height: 46,
                     onPressed: () async {
                       final navigator = Navigator.of(context);
-                      await provider.deleteTask(task.id);
+                      await provider.trashTask(task.id);
                       navigator.pop();
                     },
                   ),

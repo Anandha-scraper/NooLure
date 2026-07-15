@@ -65,15 +65,11 @@ dev_dependencies:
 flutter_native_splash:
   color: "#F8E1B7"
   color_dark: "#2A2216"
-  image: assets/icons/appicon_square.png
-  image_dark: assets/icons/appicon_square.png
   android: true
   ios: false
   web: false
   android_12:
-    image: assets/icons/appicon_square.png
     icon_background_color: "#F8E1B7"
-    image_dark: assets/icons/appicon_square.png
     icon_background_color_dark: "#2A2216"
 
 # Launcher icons, generated from assets/icons/appicon.png.

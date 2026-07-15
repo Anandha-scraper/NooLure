@@ -12,6 +12,7 @@ import '../../screens/profile/profile_screen.dart';
 import '../../screens/tasks/add_task_screen.dart';
 import '../../screens/tasks/edit_task_screen.dart';
 import '../../screens/tasks/task_screen.dart';
+import '../../screens/tasks/trash_screen.dart';
 import '../../screens/trips/add_trip_screen.dart';
 import '../../screens/trips/trip_detail_screen.dart';
 import '../../screens/trips/trip_screen.dart';
@@ -32,6 +33,8 @@ class RouteGenerator {
         return _page(EditTaskScreen(taskId: settings.arguments as String));
       case AppRoutes.addTask:
         return _page(const AddTaskScreen());
+      case AppRoutes.trash:
+        return _page(const TrashScreen());
       case AppRoutes.notes:
         return _page(const NotesScreen());
       case AppRoutes.addNote:

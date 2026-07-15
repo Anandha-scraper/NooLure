@@ -57,16 +57,21 @@ class _TaskScreenState extends State<TaskScreen> {
     return AppScaffold(
       title: 'Tasks',
       drawerRoute: AppRoutes.tasks,
-      actions: provider.allDone && !_celebrationDismissed
-          ? [
-              IconButton(
-                icon: const Icon(LucideIcons.x),
-                tooltip: 'Dismiss',
-                onPressed: () => setState(() => _celebrationDismissed = true),
-              ),
-              const SizedBox(width: 8),
-            ]
-          : null,
+      actions: [
+        IconButton(
+          icon: const Icon(LucideIcons.trash2),
+          tooltip: 'Deleted tasks',
+          onPressed: () =>
+              Navigator.of(context).pushNamed(AppRoutes.trash),
+        ),
+        if (provider.allDone && !_celebrationDismissed)
+          IconButton(
+            icon: const Icon(LucideIcons.x),
+            tooltip: 'Dismiss',
+            onPressed: () => setState(() => _celebrationDismissed = true),
+          ),
+        const SizedBox(width: 8),
+      ],
       titleStyle: TextStyles.h2(color: onSurface),
       floatingActionButton: AppFab(
         onPressed: () => Navigator.of(context).pushNamed(AppRoutes.addTask),
@@ -233,7 +238,7 @@ class _TaskScreenState extends State<TaskScreen> {
             await confirmDeleteTask(
               context,
               title: task.title,
-              onConfirm: () => provider.deleteTask(task.id),
+              onConfirm: () => provider.trashTask(task.id),
             );
           }
           return false;
