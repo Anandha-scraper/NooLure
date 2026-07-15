@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/text_styles.dart';
+import '../../models/trip_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/trip_provider.dart';
 import '../../widgets/app_scaffold.dart';
@@ -189,14 +190,19 @@ class _AddTripScreenState extends State<AddTripScreen>
     if (user == null) return;
 
     setState(() => _saving = true);
-    final trip = await context.read<TripProvider>().createTrip(
-      name: name,
-      destination: destination,
-      startDate: _startDate!,
-      endDate: _endDate!,
-      creatorUid: user.id,
-      creatorName: user.name,
-    );
+    TripModel? trip;
+    try {
+      trip = await context.read<TripProvider>().createTrip(
+        name: name,
+        destination: destination,
+        startDate: _startDate!,
+        endDate: _endDate!,
+        creatorUid: user.id,
+        creatorName: user.name,
+      );
+    } catch (_) {
+      trip = null;
+    }
     if (!mounted) return;
     setState(() => _saving = false);
 
@@ -223,11 +229,16 @@ class _AddTripScreenState extends State<AddTripScreen>
     if (user == null) return;
 
     setState(() => _saving = true);
-    final joined = await context.read<TripProvider>().joinTrip(
-      code,
-      uid: user.id,
-      name: user.name,
-    );
+    bool joined;
+    try {
+      joined = await context.read<TripProvider>().joinTrip(
+        code,
+        uid: user.id,
+        name: user.name,
+      );
+    } catch (_) {
+      joined = false;
+    }
     if (!mounted) return;
     setState(() => _saving = false);
 

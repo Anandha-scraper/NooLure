@@ -20,16 +20,16 @@
           ".write": "auth != null && !data.parent().child('createdByUid').exists()"
         },
         "name": {
-          ".write": "auth != null && root.child('trips').child($tripId).child('createdByUid').val() === auth.uid"
+          ".write": "auth != null && (newData.parent().child('createdByUid').val() === auth.uid && !data.parent().child('createdByUid').exists()) || root.child('trips').child($tripId).child('createdByUid').val() === auth.uid"
         },
         "destination": {
-          ".write": "auth != null && root.child('trips').child($tripId).child('createdByUid').val() === auth.uid"
+          ".write": "auth != null && (newData.parent().child('createdByUid').val() === auth.uid && !data.parent().child('createdByUid').exists()) || root.child('trips').child($tripId).child('createdByUid').val() === auth.uid"
         },
         "startDate": {
-          ".write": "auth != null && root.child('trips').child($tripId).child('createdByUid').val() === auth.uid"
+          ".write": "auth != null && (newData.parent().child('createdByUid').val() === auth.uid && !data.parent().child('createdByUid').exists()) || root.child('trips').child($tripId).child('createdByUid').val() === auth.uid"
         },
         "endDate": {
-          ".write": "auth != null && root.child('trips').child($tripId).child('createdByUid').val() === auth.uid"
+          ".write": "auth != null && (newData.parent().child('createdByUid').val() === auth.uid && !data.parent().child('createdByUid').exists()) || root.child('trips').child($tripId).child('createdByUid').val() === auth.uid"
         },
         "inviteCode": {
           ".write": "auth != null && !data.exists()"
@@ -38,7 +38,7 @@
           ".write": "auth != null && !data.exists()"
         },
         "updatedAt": {
-          ".write": "auth != null && data.parent().child('members').child(auth.uid).exists()"
+          ".write": "auth != null && ((newData.parent().child('createdByUid').val() === auth.uid && !data.parent().child('createdByUid').exists()) || data.parent().child('members').child(auth.uid).exists())"
         },
         "members": {
           "$uid": {
