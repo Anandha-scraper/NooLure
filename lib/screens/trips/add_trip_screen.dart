@@ -200,7 +200,8 @@ class _AddTripScreenState extends State<AddTripScreen>
         creatorUid: user.id,
         creatorName: user.name,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Create trip failed: $e');
       trip = null;
     }
     if (!mounted) return;
@@ -236,7 +237,8 @@ class _AddTripScreenState extends State<AddTripScreen>
         uid: user.id,
         name: user.name,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Join trip failed: $e');
       joined = false;
     }
     if (!mounted) return;
