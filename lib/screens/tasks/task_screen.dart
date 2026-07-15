@@ -26,6 +26,7 @@ class TaskScreen extends StatefulWidget {
 class _TaskScreenState extends State<TaskScreen> {
   bool _celebrationDismissed = false;
   bool _wasAllDone = false;
+  bool _completedExpanded = true;
 
   @override
   Widget build(BuildContext context) {
@@ -142,23 +143,45 @@ class _TaskScreenState extends State<TaskScreen> {
               ],
               if (completedTasks.isNotEmpty) ...[
                 const SizedBox(height: 18),
-                Text(
-                  'Completed (${completedTasks.length})',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: onSurface.withValues(alpha: 0.6),
+                InkWell(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: () => setState(
+                    () => _completedExpanded = !_completedExpanded,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Completed (${completedTasks.length})',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      AnimatedRotation(
+                        turns: _completedExpanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 150),
+                        child: Icon(
+                          LucideIcons.chevronDown,
+                          size: 16,
+                          color: onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 10),
-                for (final task in completedTasks)
-                  _taskRow(
-                    context,
-                    theme,
-                    provider,
-                    task,
-                    allowComplete: false,
-                  ),
+                if (_completedExpanded)
+                  for (final task in completedTasks)
+                    _taskRow(
+                      context,
+                      theme,
+                      provider,
+                      task,
+                      allowComplete: false,
+                    ),
               ],
             ],
           ),
@@ -218,14 +241,16 @@ class _TaskScreenState extends State<TaskScreen> {
         child: TaskTile(
           task: task,
           showDragHandle: true,
-          onToggle: () => provider.toggleDone(task.id),
+          onToggle: allowComplete ? () => provider.toggleDone(task.id) : null,
           onTap: () => showTaskPreview(
             context,
             task,
             onEdit: () => Navigator.of(
               context,
             ).pushNamed(AppRoutes.taskDetail, arguments: task.id),
-            onToggleDone: () => provider.toggleDone(task.id),
+            onToggleDone: allowComplete
+                ? () => provider.toggleDone(task.id)
+                : null,
           ),
           onLongPress: () => Navigator.of(
             context,

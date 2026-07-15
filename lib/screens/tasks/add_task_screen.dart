@@ -92,6 +92,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             controller: _descriptionController,
             hintText: 'Add a description (optional)',
             maxLines: 3,
+            borderRadius: BorderRadius.circular(22),
           ),
           const SizedBox(height: 30),
           ListenableBuilder(
@@ -109,10 +110,27 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   Future<void> _pickDueDate() async {
     final picked = await pickTaskDueDate(context, _dueAt);
     if (picked == null || !mounted) return;
+    if (picked.isBefore(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Pick a date and time that hasn't passed yet"),
+        ),
+      );
+      return;
+    }
     setState(() => _dueAt = picked);
   }
 
   Future<void> _submit() async {
+    final dueAt = _dueAt;
+    if (dueAt != null && dueAt.isBefore(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Pick a date and time that hasn't passed yet"),
+        ),
+      );
+      return;
+    }
     final navigator = Navigator.of(context);
     final category = _categoryController.text.trim();
     await context.read<TaskProvider>().addTask(
