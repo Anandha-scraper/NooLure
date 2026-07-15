@@ -8,6 +8,7 @@ import 'providers/birthday_provider.dart';
 import 'providers/note_provider.dart';
 import 'providers/task_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/trip_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/splash_screen.dart';
@@ -24,6 +25,7 @@ class NooLureApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NoteProvider()),
         ChangeNotifierProvider(create: (_) => BirthdayProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => TripProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {

@@ -12,6 +12,9 @@ import '../../screens/profile/profile_screen.dart';
 import '../../screens/tasks/add_task_screen.dart';
 import '../../screens/tasks/edit_task_screen.dart';
 import '../../screens/tasks/task_screen.dart';
+import '../../screens/trips/add_trip_screen.dart';
+import '../../screens/trips/trip_detail_screen.dart';
+import '../../screens/trips/trip_screen.dart';
 import 'app_routes.dart';
 
 class RouteGenerator {
@@ -45,6 +48,14 @@ class RouteGenerator {
         );
       case AppRoutes.birthdayDetail:
         return _page(BirthdayScreen(birthdayId: settings.arguments as String));
+      case AppRoutes.trips:
+        return _page(const TripScreen());
+      case AppRoutes.addTrip:
+        return _page(const AddTripScreen());
+      case AppRoutes.tripDetail:
+        return _page(
+          TripDetailScreen(tripId: settings.arguments as String),
+        );
       case AppRoutes.profile:
         return _page(const ProfileScreen());
       case AppRoutes.editProfile:

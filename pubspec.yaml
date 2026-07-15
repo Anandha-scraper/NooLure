@@ -60,15 +60,11 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.4
   flutter_native_splash: ^2.4.6
 
-# Native splash screen, generated from assets/icons/NooLure.png. The color is
-# sampled from the image's own gradient corners so the platform-imposed
-# letterbox (Android 12+'s Splash Screen API only allows a solid background +
-# a centered, size-capped icon — no true full-bleed banner) blends in instead
-# of clashing. Regenerate after changing the source art with:
-#   dart run flutter_native_splash:create
+# Native splash screen — matches the app's warm/dark theme backgrounds.
+# Regenerate after changing with:  dart run flutter_native_splash:create
 flutter_native_splash:
-  color: "#555A50"
-  color_dark: "#555A50"
+  color: "#F8E1B7"
+  color_dark: "#2A2216"
   image: assets/icons/appicon_square.png
   image_dark: assets/icons/appicon_square.png
   android: true
@@ -76,9 +72,9 @@ flutter_native_splash:
   web: false
   android_12:
     image: assets/icons/appicon_square.png
-    icon_background_color: "#555A50"
+    icon_background_color: "#F8E1B7"
     image_dark: assets/icons/appicon_square.png
-    icon_background_color_dark: "#555A50"
+    icon_background_color_dark: "#2A2216"
 
 # Launcher icons, generated from assets/icons/appicon.png.
 # Regenerate after changing the source art with:
