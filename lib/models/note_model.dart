@@ -40,6 +40,7 @@ class NoteModel {
     this.isImage = false,
     this.isPinned = false,
     this.checklist = const [],
+    this.deletedAt,
   });
 
   final String id;
@@ -52,6 +53,11 @@ class NoteModel {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// Non-null when the note has been moved to trash.
+  final DateTime? deletedAt;
+
+  bool get isDeleted => deletedAt != null;
+
   /// 'just now' / '2h ago' / 'Mar 3' — derived, never stored.
   String get editedLabel => DateLabels.relativeLabel(updatedAt);
 
@@ -63,6 +69,8 @@ class NoteModel {
     bool? isPinned,
     List<NoteChecklistItem>? checklist,
     DateTime? updatedAt,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
   }) => NoteModel(
     id: id,
     title: title ?? this.title,
@@ -73,6 +81,7 @@ class NoteModel {
     checklist: checklist ?? this.checklist,
     createdAt: createdAt,
     updatedAt: updatedAt ?? DateTime.now(),
+    deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
   );
 
   Map<String, dynamic> toJson() => {
@@ -85,6 +94,7 @@ class NoteModel {
     'checklist': checklist.map((c) => c.toJson()).toList(),
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
+    'deletedAt': deletedAt?.toIso8601String(),
   };
 
   factory NoteModel.fromJson(Map<String, dynamic> json) {
@@ -102,6 +112,7 @@ class NoteModel {
       ],
       createdAt: created,
       updatedAt: _parseDate(json['updatedAt']) ?? created,
+      deletedAt: _parseDate(json['deletedAt']),
     );
   }
 }

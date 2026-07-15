@@ -32,6 +32,12 @@ class SyncService {
   bool get isEnabled => _root != null;
   bool get isSyncing => isEnabled && _userId != null;
 
+  /// Exposes the shared root reference so other services (e.g. trips, which
+  /// live outside the per-user `/users/<uid>` tree this class owns) can reuse
+  /// the same `Firebase.initializeApp()`/persistence setup without
+  /// duplicating it.
+  DatabaseReference? get root => _root;
+
   /// Call once at startup, before `runApp`.
   Future<void> init() async {
     try {

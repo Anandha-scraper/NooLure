@@ -83,6 +83,10 @@ class _TripCard extends StatelessWidget {
             ? 'Starts today'
             : 'Started';
 
+    final itemList = trip.itemList;
+    final memberCount = trip.members.length;
+    final completeCount = itemList.where((i) => i.isComplete(memberCount)).length;
+
     return GestureDetector(
       onTap: () => Navigator.of(
         context,
@@ -127,10 +131,10 @@ class _TripCard extends StatelessWidget {
                 TagChip(daysLabel, variant: TagVariant.accent),
               ],
             ),
-            if (trip.items.isNotEmpty) ...[
+            if (itemList.isNotEmpty) ...[
               const SizedBox(height: 10),
               Text(
-                '${trip.items.where((i) => i.done).length}/${trip.items.length} items done',
+                '$completeCount/${itemList.length} items complete',
                 style: TextStyle(
                   fontSize: 11,
                   color: onSurface.withValues(alpha: 0.5),

@@ -6,6 +6,7 @@ import '../../core/routes/app_routes.dart';
 import '../../core/theme/text_styles.dart';
 import '../../providers/note_provider.dart';
 import '../../widgets/app_scaffold.dart';
+import '../../widgets/confirm_delete_dialog.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/note_preview_sheet.dart';
 import '../../widgets/note_tile.dart';
@@ -32,6 +33,14 @@ class _NotesScreenState extends State<NotesScreen> {
       title: 'Notes',
       drawerRoute: AppRoutes.notes,
       titleStyle: TextStyles.h2(color: onSurface),
+      actions: [
+        IconButton(
+          icon: const Icon(LucideIcons.trash2),
+          tooltip: 'Deleted notes',
+          onPressed: () => Navigator.of(context).pushNamed(AppRoutes.notesTrash),
+        ),
+        const SizedBox(width: 8),
+      ],
       floatingActionButton: AppFab(
         onPressed: () => Navigator.of(context).pushNamed(AppRoutes.addNote),
       ),
@@ -97,7 +106,11 @@ class _NotesScreenState extends State<NotesScreen> {
                     context,
                   ).pushNamed(AppRoutes.editNote, arguments: pinned.id),
                   onTogglePin: () => provider.togglePinned(pinned.id),
-                  onDelete: () => provider.deleteNote(pinned.id),
+                  onDelete: () => confirmDeleteTask(
+                    context,
+                    title: pinned.title,
+                    onConfirm: () => provider.trashNote(pinned.id),
+                  ),
                 ),
                 onLongPress: () => Navigator.of(
                   context,
@@ -135,7 +148,11 @@ class _NotesScreenState extends State<NotesScreen> {
                   context,
                 ).pushNamed(AppRoutes.editNote, arguments: grid[i].id),
                 onTogglePin: () => provider.togglePinned(grid[i].id),
-                onDelete: () => provider.deleteNote(grid[i].id),
+                onDelete: () => confirmDeleteTask(
+                  context,
+                  title: grid[i].title,
+                  onConfirm: () => provider.trashNote(grid[i].id),
+                ),
               ),
               onLongPress: () => Navigator.of(
                 context,

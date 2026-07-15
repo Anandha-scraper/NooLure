@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/data/local_store.dart';
 import '../core/data/sync_service.dart';
+import '../core/data/trip_sync_service.dart';
 import '../core/services/auth_service.dart';
 import '../models/user_model.dart';
 
@@ -38,6 +39,7 @@ class AuthProvider extends ChangeNotifier {
       }
       currentUser = user;
       await SyncService.instance.bind(user.id);
+      await TripSyncService.instance.bind(user.id);
       status = AuthStatus.authenticated;
     } else {
       if (signedIn) {
@@ -65,6 +67,7 @@ class AuthProvider extends ChangeNotifier {
 
       // No-op unless a Firebase config is present; local data is already usable.
       await SyncService.instance.bind(user.id);
+      await TripSyncService.instance.bind(user.id);
 
       final savedName = await SyncService.instance.fetchProfileName();
       if (savedName != null && savedName.isNotEmpty) {
@@ -110,6 +113,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> signOut() async {
     await _authService.signOut();
     await SyncService.instance.unbind();
+    await TripSyncService.instance.unbind();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_sessionKey, false);
     currentUser = null;
@@ -128,6 +132,7 @@ class AuthProvider extends ChangeNotifier {
     await LocalStore.clearAll();
     await _authService.deleteAccount();
     await SyncService.instance.unbind();
+    await TripSyncService.instance.unbind();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_sessionKey, false);

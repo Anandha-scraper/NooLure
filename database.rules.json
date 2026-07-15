@@ -1,0 +1,76 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "trips": {
+      "$tripId": {
+        ".read": "auth != null && data.child('members').child(auth.uid).exists()",
+        "createdByUid": {
+          ".write": "auth != null && (!data.exists() || data.val() === auth.uid)"
+        },
+        "createdByName": {
+          ".write": "auth != null && !data.parent().child('createdByUid').exists()"
+        },
+        "name": {
+          ".write": "auth != null && root.child('trips').child($tripId).child('createdByUid').val() === auth.uid"
+        },
+        "destination": {
+          ".write": "auth != null && root.child('trips').child($tripId).child('createdByUid').val() === auth.uid"
+        },
+        "startDate": {
+          ".write": "auth != null && root.child('trips').child($tripId).child('createdByUid').val() === auth.uid"
+        },
+        "endDate": {
+          ".write": "auth != null && root.child('trips').child($tripId).child('createdByUid').val() === auth.uid"
+        },
+        "inviteCode": {
+          ".write": "auth != null && !data.exists()"
+        },
+        "createdAt": {
+          ".write": "auth != null && !data.exists()"
+        },
+        "updatedAt": {
+          ".write": "auth != null && data.parent().child('members').child(auth.uid).exists()"
+        },
+        "members": {
+          "$uid": {
+            ".write": "auth != null && (auth.uid === $uid || root.child('trips').child($tripId).child('createdByUid').val() === auth.uid)"
+          }
+        },
+        "items": {
+          ".write": "auth != null && root.child('trips').child($tripId).child('createdByUid').val() === auth.uid",
+          "$itemId": {
+            "responses": {
+              ".write": "auth != null && root.child('trips').child($tripId).child('members').child(auth.uid).exists()",
+              "$uid": {
+                ".write": "auth != null && auth.uid === $uid"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "tripInviteCodes": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() || newData.val() === data.val() || newData.val() === null)"
+      }
+    },
+
+    "userTrips": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null"
+      }
+    }
+  }
+}

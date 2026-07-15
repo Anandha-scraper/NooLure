@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/text_styles.dart';
+import '../../models/trip_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/trip_provider.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/card_container.dart';
@@ -30,6 +32,10 @@ class TripDetailScreen extends StatelessWidget {
         body: Center(child: Text('Trip not found')),
       );
     }
+
+    final currentUid = context.watch<AuthProvider>().currentUser?.id;
+    final isAdmin = trip.isAdmin(currentUid);
+    final memberCount = trip.members.length;
 
     final accentInk = AppColors.accentInk(
       theme.colorScheme.primary,
@@ -66,7 +72,7 @@ class TripDetailScreen extends StatelessWidget {
                   children: [
                     TagChip(trip.dateRange, variant: TagVariant.neutral),
                     TagChip(
-                      '${trip.members.length} member${trip.members.length == 1 ? '' : 's'}',
+                      '$memberCount member${memberCount == 1 ? '' : 's'}',
                       variant: TagVariant.accent2,
                     ),
                   ],
@@ -119,8 +125,20 @@ class TripDetailScreen extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final m in trip.members)
-                      TagChip(m, variant: TagVariant.accent2),
+                    for (final m in trip.memberList)
+                      TagChip(
+                        m.name,
+                        variant: TagVariant.accent2,
+                        onTap: isAdmin && m.uid != trip.createdByUid
+                            ? () => _confirmRemoveMember(
+                                context,
+                                provider,
+                                tripId,
+                                m,
+                                currentUid!,
+                              )
+                            : null,
+                      ),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -132,7 +150,7 @@ class TripDetailScreen extends StatelessWidget {
                     ),
                     const Spacer(),
                     Text(
-                      '${trip.items.where((i) => i.done).length}/${trip.items.length}',
+                      '${trip.itemList.where((i) => i.isComplete(memberCount)).length}/${trip.itemList.length}',
                       style: TextStyle(
                         fontSize: 12,
                         color: onSurface.withValues(alpha: 0.5),
@@ -141,29 +159,100 @@ class TripDetailScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                for (final item in trip.items)
+                for (final item in trip.itemList)
                   _ChecklistRow(
                     item: item,
-                    onToggle: () => provider.toggleItem(tripId, item.id),
+                    memberCount: memberCount,
+                    respondedByMe:
+                        currentUid != null && item.respondedBy(currentUid),
+                    onToggleMine: currentUid == null
+                        ? null
+                        : () => provider.toggleResponse(
+                            tripId,
+                            item.id,
+                            currentUid,
+                          ),
+                    isAdmin: isAdmin,
+                    onDelete: currentUid == null
+                        ? null
+                        : () => provider.deleteItem(
+                            tripId,
+                            item.id,
+                            requestingUid: currentUid,
+                          ),
                     onSurface: onSurface,
                   ),
                 const SizedBox(height: 8),
-                _AddItemRow(
-                  onAdd: (title) => provider.addItem(tripId, title),
-                ),
+                if (isAdmin)
+                  _AddItemRow(
+                    onAdd: (title) => provider.addItem(
+                      tripId,
+                      title,
+                      requestingUid: currentUid!,
+                    ),
+                  ),
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-            child: SecondaryButton(
-              label: 'Delete Trip',
-              height: 46,
-              onPressed: () {
-                provider.deleteTrip(tripId);
-                Navigator.of(context).pop();
-              },
+          if (isAdmin)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              child: SecondaryButton(
+                label: 'Delete Trip',
+                height: 46,
+                onPressed: () {
+                  provider.deleteTrip(tripId, requestingUid: currentUid!);
+                  Navigator.of(context).pop();
+                },
+              ),
+            )
+          else if (currentUid != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              child: SecondaryButton(
+                label: 'Leave Trip',
+                height: 46,
+                onPressed: () {
+                  provider.removeMember(
+                    tripId,
+                    currentUid,
+                    requestingUid: currentUid,
+                  );
+                  Navigator.of(context).pop();
+                },
+              ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmRemoveMember(
+    BuildContext context,
+    TripProvider provider,
+    String tripId,
+    TripMember member,
+    String requestingUid,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Remove ${member.name} from this trip?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              provider.removeMember(
+                tripId,
+                member.uid,
+                requestingUid: requestingUid,
+              );
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text('Remove'),
           ),
         ],
       ),
@@ -174,42 +263,61 @@ class TripDetailScreen extends StatelessWidget {
 class _ChecklistRow extends StatelessWidget {
   const _ChecklistRow({
     required this.item,
-    required this.onToggle,
+    required this.memberCount,
+    required this.respondedByMe,
+    required this.onToggleMine,
+    required this.isAdmin,
+    required this.onDelete,
     required this.onSurface,
   });
 
-  final dynamic item;
-  final VoidCallback onToggle;
+  final TripItem item;
+  final int memberCount;
+  final bool respondedByMe;
+  final VoidCallback? onToggleMine;
+  final bool isAdmin;
+  final VoidCallback? onDelete;
   final Color onSurface;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onToggle,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Icon(
-              item.done ? LucideIcons.circleCheck : LucideIcons.circle,
-              size: 20,
-              color: onSurface.withValues(alpha: item.done ? 0.4 : 0.7),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                item.title,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: onSurface.withValues(alpha: item.done ? 0.4 : 1),
-                  decoration:
-                      item.done ? TextDecoration.lineThrough : null,
-                ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: onToggleMine,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Icon(
+                respondedByMe ? LucideIcons.circleCheck : LucideIcons.circle,
+                size: 20,
+                color: onSurface.withValues(alpha: respondedByMe ? 0.4 : 0.7),
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              item.title,
+              style: TextStyle(fontSize: 14, color: onSurface),
+            ),
+          ),
+          Text(
+            '${item.responseCount}/$memberCount',
+            style: TextStyle(
+              fontSize: 12,
+              color: onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+          if (isAdmin)
+            IconButton(
+              icon: const Icon(LucideIcons.trash2, size: 16),
+              tooltip: 'Delete item',
+              onPressed: onDelete,
+            ),
+        ],
       ),
     );
   }

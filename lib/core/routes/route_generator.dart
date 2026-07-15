@@ -7,6 +7,7 @@ import '../../screens/birthdays/birthdays_screen.dart';
 import '../../screens/home/home_screen.dart';
 import '../../screens/notes/add_note_screen.dart';
 import '../../screens/notes/notes_screen.dart';
+import '../../screens/notes/notes_trash_screen.dart';
 import '../../screens/profile/edit_profile_screen.dart';
 import '../../screens/profile/profile_screen.dart';
 import '../../screens/tasks/add_task_screen.dart';
@@ -41,6 +42,8 @@ class RouteGenerator {
         return _page(const AddNoteScreen());
       case AppRoutes.editNote:
         return _page(AddNoteScreen(noteId: settings.arguments as String));
+      case AppRoutes.notesTrash:
+        return _page(const NotesTrashScreen());
       case AppRoutes.birthdays:
         return _page(const BirthdaysScreen());
       case AppRoutes.addBirthday:
