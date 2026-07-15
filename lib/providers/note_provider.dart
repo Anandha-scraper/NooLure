@@ -10,10 +10,13 @@ import '../models/note_model.dart';
 class NoteProvider extends ChangeNotifier {
   NoteProvider({Repository<NoteModel>? repository})
     : _repository = repository ?? Repositories.notes {
-    _subscription = _repository.watch().listen((notes) {
-      _notes = notes..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-      notifyListeners();
-    });
+    _apply(_repository.all());
+    _subscription = _repository.watch().skip(1).listen(_apply);
+  }
+
+  void _apply(List<NoteModel> notes) {
+    _notes = notes..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    notifyListeners();
   }
 
   final Repository<NoteModel> _repository;

@@ -10,12 +10,15 @@ import '../models/task_model.dart';
 class TaskProvider extends ChangeNotifier {
   TaskProvider({Repository<TaskModel>? repository})
     : _repository = repository ?? Repositories.tasks {
-    _subscription = _repository.watch().listen((tasks) {
-      _allTasks = tasks;
-      _tasks = tasks.where((t) => !t.isDeleted).toList()
-        ..sort(_byDueThenCreated);
-      notifyListeners();
-    });
+    _apply(_repository.all());
+    _subscription = _repository.watch().skip(1).listen(_apply);
+  }
+
+  void _apply(List<TaskModel> tasks) {
+    _allTasks = tasks;
+    _tasks = tasks.where((t) => !t.isDeleted).toList()
+      ..sort(_byDueThenCreated);
+    notifyListeners();
   }
 
   final Repository<TaskModel> _repository;
