@@ -10,13 +10,15 @@ import '../models/birthday_model.dart';
 class BirthdayProvider extends ChangeNotifier {
   BirthdayProvider({Repository<BirthdayModel>? repository})
     : _repository = repository ?? Repositories.birthdays {
-    _subscription = _repository.watch().listen((birthdays) {
-      // Soonest birthday first — the countdown is recomputed from month/day
-      // on every emission, so the order stays correct as days pass.
-      _birthdays = birthdays
-        ..sort((a, b) => a.daysUntil.compareTo(b.daysUntil));
-      notifyListeners();
-    });
+    _apply(_repository.all());
+    _subscription = _repository.watch().skip(1).listen(_apply);
+  }
+
+  // Soonest birthday first — the countdown is recomputed from month/day on
+  // every emission, so the order stays correct as days pass.
+  void _apply(List<BirthdayModel> birthdays) {
+    _birthdays = birthdays..sort((a, b) => a.daysUntil.compareTo(b.daysUntil));
+    notifyListeners();
   }
 
   final Repository<BirthdayModel> _repository;
