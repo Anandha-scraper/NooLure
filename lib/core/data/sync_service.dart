@@ -125,6 +125,22 @@ class SyncService {
     await _collectionRef(collection)?.child(id).remove();
   }
 
+  Future<void> pushProfileName(String name) async {
+    final root = _root;
+    final userId = _userId;
+    if (root == null || userId == null) return;
+    await root.child('users').child(userId).child('profile').child('name').set(name);
+  }
+
+  Future<String?> fetchProfileName() async {
+    final root = _root;
+    final userId = _userId;
+    if (root == null || userId == null) return null;
+    final snapshot = await root.child('users').child(userId).child('profile').child('name').get();
+    final value = snapshot.value;
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
   /// Wipes everything this user has mirrored to the server — used when a
   /// user deletes their account.
   Future<void> deleteRemoteUserData(String userId) async {

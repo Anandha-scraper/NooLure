@@ -199,6 +199,28 @@ class HomeScreen extends StatelessWidget {
                     child: TaskTile(task: task, dense: true),
                   ),
                 ),
+            if (tasks.homeTasks.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'swipe to complete →',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: onSurface.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  Text(
+                    '← swipe to view',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: onSurface.withValues(alpha: 0.45),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
