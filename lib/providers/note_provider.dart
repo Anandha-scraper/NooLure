@@ -15,7 +15,9 @@ class NoteProvider extends ChangeNotifier {
   }
 
   void _apply(List<NoteModel> notes) {
-    _notes = notes..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    _allNotes = notes;
+    _notes = notes.where((n) => !n.isDeleted).toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     notifyListeners();
   }
 
@@ -23,6 +25,7 @@ class NoteProvider extends ChangeNotifier {
   static const _uuid = Uuid();
 
   StreamSubscription<List<NoteModel>>? _subscription;
+  List<NoteModel> _allNotes = [];
   List<NoteModel> _notes = [];
 
   List<NoteModel> get notes => List.unmodifiable(_notes);
@@ -96,7 +99,40 @@ class NoteProvider extends ChangeNotifier {
 
   Future<void> updateNote(NoteModel note) => _repository.save(note);
 
-  Future<void> deleteNote(String id) => _repository.delete(id);
+  List<NoteModel> get trashedNotes {
+    final trashed = _allNotes.where((n) => n.isDeleted).toList();
+    trashed.sort((a, b) => b.deletedAt!.compareTo(a.deletedAt!));
+    return trashed;
+  }
+
+  int get trashCount => _allNotes.where((n) => n.isDeleted).length;
+
+  Future<void> trashNote(String id) async {
+    final note = _findInAll(id);
+    if (note == null) return;
+    await _repository.save(note.copyWith(deletedAt: DateTime.now()));
+  }
+
+  Future<void> restoreNote(String id) async {
+    final note = _findInAll(id);
+    if (note == null) return;
+    await _repository.save(note.copyWith(clearDeletedAt: true));
+  }
+
+  Future<void> permanentlyDeleteNote(String id) => _repository.delete(id);
+
+  Future<void> emptyTrash() async {
+    for (final n in trashedNotes) {
+      await _repository.delete(n.id);
+    }
+  }
+
+  NoteModel? _findInAll(String id) {
+    for (final n in _allNotes) {
+      if (n.id == id) return n;
+    }
+    return null;
+  }
 
   @override
   void dispose() {

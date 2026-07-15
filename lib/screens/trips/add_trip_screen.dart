@@ -24,6 +24,7 @@ class _AddTripScreenState extends State<AddTripScreen>
   final _codeController = TextEditingController();
   DateTime? _startDate;
   DateTime? _endDate;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -111,7 +112,7 @@ class _AddTripScreenState extends State<AddTripScreen>
         PrimaryButton(
           label: 'Create Trip',
           height: 46,
-          onPressed: _createTrip,
+          onPressed: _saving ? null : _createTrip,
         ),
       ],
     );
@@ -140,7 +141,7 @@ class _AddTripScreenState extends State<AddTripScreen>
         PrimaryButton(
           label: 'Join Trip',
           height: 46,
-          onPressed: _joinTrip,
+          onPressed: _saving ? null : _joinTrip,
         ),
       ],
     );
@@ -169,7 +170,7 @@ class _AddTripScreenState extends State<AddTripScreen>
     });
   }
 
-  void _createTrip() {
+  Future<void> _createTrip() async {
     final name = _nameController.text.trim();
     final destination = _destinationController.text.trim();
     if (name.isEmpty || destination.isEmpty) {
@@ -184,19 +185,33 @@ class _AddTripScreenState extends State<AddTripScreen>
       );
       return;
     }
-    final userName =
-        context.read<AuthProvider>().currentUser?.name ?? 'You';
-    context.read<TripProvider>().addTrip(
+    final user = context.read<AuthProvider>().currentUser;
+    if (user == null) return;
+
+    setState(() => _saving = true);
+    final trip = await context.read<TripProvider>().createTrip(
       name: name,
       destination: destination,
       startDate: _startDate!,
       endDate: _endDate!,
-      createdBy: userName,
+      creatorUid: user.id,
+      creatorName: user.name,
     );
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    if (trip == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not create trip — check your connection and try again'),
+        ),
+      );
+      return;
+    }
     Navigator.of(context).pop();
   }
 
-  void _joinTrip() {
+  Future<void> _joinTrip() async {
     final code = _codeController.text.trim();
     if (code.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -204,9 +219,18 @@ class _AddTripScreenState extends State<AddTripScreen>
       );
       return;
     }
-    final userName =
-        context.read<AuthProvider>().currentUser?.name ?? 'You';
-    final joined = context.read<TripProvider>().joinTrip(code, userName);
+    final user = context.read<AuthProvider>().currentUser;
+    if (user == null) return;
+
+    setState(() => _saving = true);
+    final joined = await context.read<TripProvider>().joinTrip(
+      code,
+      uid: user.id,
+      name: user.name,
+    );
+    if (!mounted) return;
+    setState(() => _saving = false);
+
     if (!joined) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No trip found with that code')),

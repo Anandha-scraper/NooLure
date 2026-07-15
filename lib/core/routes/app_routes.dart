@@ -10,6 +10,7 @@ class AppRoutes {
   static const String notes = '/notes';
   static const String addNote = '/notes/add';
   static const String editNote = '/notes/edit';
+  static const String notesTrash = '/notes/trash';
   static const String birthdays = '/birthdays';
   static const String birthdayDetail = '/birthdays/detail';
   static const String addBirthday = '/birthdays/add';
