@@ -113,6 +113,16 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                   onPick: () async {
                     final picked = await pickTaskDueDate(context, _dueAt);
                     if (picked == null || !mounted) return;
+                    if (picked.isBefore(DateTime.now())) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "Pick a date and time that hasn't passed yet",
+                          ),
+                        ),
+                      );
+                      return;
+                    }
                     setState(() {
                       _dueAt = picked;
                       _clearDueAt = false;
@@ -201,6 +211,14 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
   }
 
   Future<void> _save(TaskProvider provider, TaskModel task) async {
+    if (_dueAt != null && _dueAt!.isBefore(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Pick a date and time that hasn't passed yet"),
+        ),
+      );
+      return;
+    }
     final navigator = Navigator.of(context);
     final category = _categoryController.text.trim();
     await provider.updateTask(

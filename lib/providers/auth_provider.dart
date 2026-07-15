@@ -66,6 +66,12 @@ class AuthProvider extends ChangeNotifier {
       // No-op unless a Firebase config is present; local data is already usable.
       await SyncService.instance.bind(user.id);
 
+      final savedName = await SyncService.instance.fetchProfileName();
+      if (savedName != null && savedName.isNotEmpty) {
+        currentUser = user.copyWith(name: savedName);
+        await prefs.setString(_displayNameKey, savedName);
+      }
+
       status = AuthStatus.authenticated;
     } catch (e) {
       // Without this, any failure (dialog cancelled, no cached Google
@@ -98,6 +104,7 @@ class AuthProvider extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_displayNameKey, trimmed);
+    await SyncService.instance.pushProfileName(trimmed);
   }
 
   Future<void> signOut() async {
