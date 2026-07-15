@@ -241,16 +241,14 @@ class _TaskScreenState extends State<TaskScreen> {
         child: TaskTile(
           task: task,
           showDragHandle: true,
-          onToggle: allowComplete ? () => provider.toggleDone(task.id) : null,
+          onToggle: null,
           onTap: () => showTaskPreview(
             context,
             task,
             onEdit: () => Navigator.of(
               context,
             ).pushNamed(AppRoutes.taskDetail, arguments: task.id),
-            onToggleDone: allowComplete
-                ? () => provider.toggleDone(task.id)
-                : null,
+            onToggleDone: null,
           ),
           onLongPress: () => Navigator.of(
             context,

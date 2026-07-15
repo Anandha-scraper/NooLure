@@ -1,29 +1,49 @@
 import 'package:flutter/material.dart';
 
-/// Shown while [AuthProvider] is resolving session state (cold start, or an
-/// interactive sign-in in flight). The native pre-Flutter splash can only
-/// show a size-capped, centered icon (a platform limit, not a choice), so
-/// this is where the full NooLure.png wordmark — uncropped, pinned to the
-/// top — actually appears.
+import '../core/constants/app_colors.dart';
+import '../core/theme/text_styles.dart';
+
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final onSurface = theme.colorScheme.onSurface;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF555A50),
-      body: SafeArea(
+      body: Center(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 24),
-            Image.asset(
-              'assets/icons/NooLure.png',
-              width: double.infinity,
-              fit: BoxFit.fitWidth,
+            Icon(
+              Icons.auto_stories_rounded,
+              size: 64,
+              color: AppColors.accentInk(primary, theme.brightness),
             ),
-            const Spacer(),
-            const CircularProgressIndicator(color: Colors.white),
+            const SizedBox(height: 20),
+            Text(
+              'NooLure',
+              style: TextStyles.h1(color: onSurface),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Your space to plan',
+              style: TextStyle(
+                fontSize: 14,
+                color: onSurface.withValues(alpha: 0.5),
+              ),
+            ),
             const SizedBox(height: 48),
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: AppColors.accentInk(primary, theme.brightness),
+              ),
+            ),
           ],
         ),
       ),
