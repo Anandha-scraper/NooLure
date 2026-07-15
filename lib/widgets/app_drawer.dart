@@ -24,8 +24,9 @@ const _drawerItems = [
 ];
 
 /// The side-drawer nav — header (avatar/name/email), nav items with an
-/// active-pill highlight, then Settings/Log out. Used via `Scaffold(drawer:)`
-/// on every top-level screen; `currentRoute` decides which pill is active.
+/// active-pill highlight, then Settings. Log out lives on the Profile screen
+/// only. Used via `Scaffold(drawer:)` on every top-level screen;
+/// `currentRoute` decides which pill is active.
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key, required this.currentRoute});
 
@@ -93,20 +94,6 @@ class AppDrawer extends StatelessWidget {
                   if (currentRoute != AppRoutes.profile) {
                     goToSection(context, AppRoutes.profile);
                   }
-                },
-              ),
-              _DrawerRow(
-                icon: LucideIcons.logOut,
-                label: 'Log out',
-                active: false,
-                faded: true,
-                onTap: () async {
-                  final navigator = Navigator.of(context);
-                  navigator.pop();
-                  // Unwind to the root, which is AuthGate — it watches
-                  // AuthProvider, so signing out swaps it to Login on its own.
-                  navigator.popUntil((route) => route.isFirst);
-                  await context.read<AuthProvider>().signOut();
                 },
               ),
             ],

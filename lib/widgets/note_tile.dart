@@ -80,8 +80,10 @@ class NoteTile extends StatelessWidget {
 
 /// The pinned "sticky note" highlight card with a mini checklist preview.
 ///
-/// This one deliberately keeps its fixed yellow/ink pair in both themes — it's
-/// a sticky note, and a sticky note is yellow.
+/// Keeps the yellow hue as its identity, but derives the actual fill/ink from
+/// [AppColors.softFill]/[AppColors.softInk] so it reads as a pale tint in
+/// light mode and a muted deep gold in dark mode instead of one fixed hex
+/// pair that stays glaring regardless of theme.
 class PinnedNoteCard extends StatelessWidget {
   const PinnedNoteCard({
     super.key,
@@ -98,11 +100,15 @@ class PinnedNoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final fill = AppColors.softFill(AppColors.highlight, brightness);
+    final ink = AppColors.softInk(AppColors.highlight, brightness);
+
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
       child: CardContainer(
-        color: AppColors.highlight,
+        color: fill,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -116,22 +122,15 @@ class PinnedNoteCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.highlightText.withValues(alpha: 0.14),
+                    color: ink.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     note.tag,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.highlightText,
-                    ),
+                    style: TextStyle(fontSize: 11, color: ink),
                   ),
                 ),
-                const Icon(
-                  LucideIcons.pin,
-                  size: 14,
-                  color: AppColors.highlightText,
-                ),
+                Icon(LucideIcons.pin, size: 14, color: ink),
               ],
             ),
             const SizedBox(height: 6),
@@ -140,10 +139,7 @@ class PinnedNoteCard extends StatelessWidget {
               // Caprasimo, matching NoteTile's title — these two cards sit
               // side by side and used to render the same element in different
               // typefaces.
-              style: TextStyles.heading(
-                size: 17,
-                color: AppColors.highlightText,
-              ),
+              style: TextStyles.heading(size: 17, color: ink),
             ),
             const SizedBox(height: 6),
             for (final item in note.checklist)
@@ -154,21 +150,14 @@ class PinnedNoteCard extends StatelessWidget {
                   child: Row(
                     children: [
                       if (item.done)
-                        const Icon(
-                          LucideIcons.check,
-                          size: 13,
-                          color: AppColors.highlightText,
-                        )
+                        Icon(LucideIcons.check, size: 13, color: ink)
                       else
                         Container(
                           width: 13,
                           height: 13,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: AppColors.highlightText,
-                              width: 1.5,
-                            ),
+                            border: Border.all(color: ink, width: 1.5),
                           ),
                         ),
                       const SizedBox(width: 8),
@@ -179,7 +168,7 @@ class PinnedNoteCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: AppColors.highlightText,
+                            color: ink,
                             decoration: item.done
                                 ? TextDecoration.lineThrough
                                 : null,

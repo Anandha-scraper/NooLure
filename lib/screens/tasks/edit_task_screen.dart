@@ -164,6 +164,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                   controller: _descriptionController,
                   hintText: 'Add a description (optional)',
                   maxLines: 3,
+                  borderRadius: BorderRadius.circular(22),
                 ),
               ],
             ),

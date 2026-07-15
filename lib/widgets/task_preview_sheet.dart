@@ -14,7 +14,7 @@ Future<void> showTaskPreview(
   BuildContext context,
   TaskModel task, {
   required VoidCallback? onEdit,
-  required VoidCallback onToggleDone,
+  required VoidCallback? onToggleDone,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -41,7 +41,7 @@ class _TaskPreviewSheet extends StatelessWidget {
 
   final TaskModel task;
   final VoidCallback? onEdit;
-  final VoidCallback onToggleDone;
+  final VoidCallback? onToggleDone;
 
   @override
   Widget build(BuildContext context) {

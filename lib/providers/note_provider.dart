@@ -66,7 +66,11 @@ class NoteProvider extends ChangeNotifier {
   Future<void> togglePinned(String id) async {
     final note = byId(id);
     if (note == null) return;
-    await _repository.save(note.copyWith(isPinned: !note.isPinned));
+    // Pinning isn't a content edit — keep the existing updatedAt so "Edited
+    // X ago" only reflects actual title/body/checklist changes.
+    await _repository.save(
+      note.copyWith(isPinned: !note.isPinned, updatedAt: note.updatedAt),
+    );
   }
 
   Future<void> addNote({

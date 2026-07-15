@@ -119,10 +119,18 @@ Future<DateTime?> pickTaskDueDate(
   DateTime? current,
 ) async {
   final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final initial = current ?? now;
+  // Past dates aren't offered for new/undated tasks, but an already-overdue
+  // task being edited keeps its own date as the lower bound — otherwise
+  // initialDate would fall outside [firstDate, lastDate] and throw.
+  final firstDate = initial.isBefore(today)
+      ? DateTime(initial.year, initial.month, initial.day)
+      : today;
   final date = await showDatePicker(
     context: context,
-    initialDate: current ?? now,
-    firstDate: DateTime(now.year - 1),
+    initialDate: initial,
+    firstDate: firstDate,
     lastDate: DateTime(now.year + 5),
   );
   if (date == null || !context.mounted) return null;
