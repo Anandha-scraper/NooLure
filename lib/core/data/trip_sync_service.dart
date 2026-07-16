@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../models/trip_model.dart';
@@ -42,21 +43,35 @@ class TripSyncService {
   final Map<String, TripModel> _cache = {};
   final StreamController<List<TripModel>> _controller =
       StreamController<List<TripModel>>.broadcast();
+  final StreamController<String?> _errorController =
+      StreamController<String?>.broadcast();
 
   /// Live feed of every trip the currently bound uid belongs to.
   Stream<List<TripModel>> get tripsStream => _controller.stream;
+
+  /// Fires with a message whenever a trip listener errors out (e.g. a rules
+  /// rejection), and with `null` once a subsequent read succeeds — lets
+  /// [TripProvider] tell "no trips" apart from "trips failed to load."
+  Stream<String?> get errorStream => _errorController.stream;
 
   List<TripModel> get currentTrips => _cache.values.toList();
 
   Future<void> bind(String uid) async {
     if (_uid == uid) return;
     await unbind();
-    _uid = uid;
     final root = _root;
     if (root == null) return;
-    _userTripsSub = root.child('userTrips').child(uid).onValue.listen((event) {
-      _reconcileTripSubs(_idsFromSnapshot(event.snapshot.value));
-    });
+    _uid = uid;
+    _userTripsSub = root.child('userTrips').child(uid).onValue.listen(
+      (event) {
+        _errorController.add(null);
+        _reconcileTripSubs(_idsFromSnapshot(event.snapshot.value));
+      },
+      onError: (Object error) {
+        debugPrint('NooLure: trip list sync error — $error');
+        _errorController.add(error.toString());
+      },
+    );
   }
 
   Future<void> unbind() async {
@@ -77,15 +92,22 @@ class TripSyncService {
 
     for (final id in ids) {
       if (_tripSubs.containsKey(id)) continue;
-      _tripSubs[id] = root.child('trips').child(id).onValue.listen((event) {
-        final value = event.snapshot.value;
-        if (value is Map) {
-          _cache[id] = TripModel.fromJson(id, Map<String, dynamic>.from(value));
-        } else {
-          _cache.remove(id);
-        }
-        _controller.add(_cache.values.toList());
-      });
+      _tripSubs[id] = root.child('trips').child(id).onValue.listen(
+        (event) {
+          _errorController.add(null);
+          final value = event.snapshot.value;
+          if (value is Map) {
+            _cache[id] = TripModel.fromJson(id, Map<String, dynamic>.from(value));
+          } else {
+            _cache.remove(id);
+          }
+          _controller.add(_cache.values.toList());
+        },
+        onError: (Object error) {
+          debugPrint('NooLure: trip sync error ($id) — $error');
+          _errorController.add(error.toString());
+        },
+      );
     }
 
     for (final id in _tripSubs.keys.toList()) {
