@@ -12,21 +12,34 @@ import '../../widgets/card_container.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/tag_chip.dart';
 
-class TripScreen extends StatelessWidget {
+class TripScreen extends StatefulWidget {
   const TripScreen({super.key});
 
+  @override
+  State<TripScreen> createState() => _TripScreenState();
+}
+
+class _TripScreenState extends State<TripScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    final trips = context.watch<TripProvider>().trips;
+    final tripProvider = context.watch<TripProvider>();
+    final trips = tripProvider.trips;
+    final loadError = tripProvider.loadError;
 
     return AppScaffold(
       title: 'Trip Planner',
       drawerRoute: AppRoutes.trips,
       titleStyle: TextStyles.h2(color: onSurface),
       floatingActionButton: AppFab(
-        onPressed: () => Navigator.of(context).pushNamed(AppRoutes.addTrip),
+        onPressed: () async {
+          final result = await Navigator.of(context).pushNamed(AppRoutes.addTrip);
+          if (result is! String || !context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Trip "$result" created')),
+          );
+        },
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
@@ -39,7 +52,19 @@ class TripScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          if (trips.isEmpty)
+          if (loadError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 18),
+              child: Text(
+                "Couldn't load trips — check your connection and pull to retry",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ),
+          if (trips.isEmpty && loadError == null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 28),
               child: Text(

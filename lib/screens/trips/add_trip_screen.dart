@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -191,6 +192,7 @@ class _AddTripScreenState extends State<AddTripScreen>
 
     setState(() => _saving = true);
     TripModel? trip;
+    Object? error;
     try {
       trip = await context.read<TripProvider>().createTrip(
         name: name,
@@ -200,22 +202,31 @@ class _AddTripScreenState extends State<AddTripScreen>
         creatorUid: user.id,
         creatorName: user.name,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Create trip failed: $e');
       trip = null;
+      error = e;
     }
     if (!mounted) return;
     setState(() => _saving = false);
 
     if (trip == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not create trip — check your connection and try again'),
+        SnackBar(
+          content: Text(
+            error != null
+                ? 'Could not create trip: ${_describe(error)}'
+                : 'Could not create trip — check your connection and try again',
+          ),
         ),
       );
       return;
     }
-    Navigator.of(context).pop();
+    Navigator.of(context).pop(trip.name);
   }
+
+  String _describe(Object error) =>
+      error is FirebaseException ? error.message ?? error.code : error.toString();
 
   Future<void> _joinTrip() async {
     final code = _codeController.text.trim();
@@ -230,21 +241,30 @@ class _AddTripScreenState extends State<AddTripScreen>
 
     setState(() => _saving = true);
     bool joined;
+    Object? error;
     try {
       joined = await context.read<TripProvider>().joinTrip(
         code,
         uid: user.id,
         name: user.name,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Join trip failed: $e');
       joined = false;
+      error = e;
     }
     if (!mounted) return;
     setState(() => _saving = false);
 
     if (!joined) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No trip found with that code')),
+        SnackBar(
+          content: Text(
+            error != null
+                ? 'Could not join trip: ${_describe(error)}'
+                : 'No trip found with that code',
+          ),
+        ),
       );
       return;
     }

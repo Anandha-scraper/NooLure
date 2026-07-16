@@ -12,13 +12,24 @@ class TripProvider extends ChangeNotifier {
       _trips = List.of(trips)..sort((a, b) => a.startDate.compareTo(b.startDate));
       notifyListeners();
     });
+    _errorSubscription = _sync.errorStream.listen((error) {
+      _loadError = error;
+      notifyListeners();
+    });
   }
 
   final TripSyncService _sync;
   StreamSubscription<List<TripModel>>? _subscription;
+  StreamSubscription<String?>? _errorSubscription;
   List<TripModel> _trips = [];
+  String? _loadError;
 
   List<TripModel> get trips => List.unmodifiable(_trips);
+
+  /// Set when a trip listener errored (e.g. a permission rejection), cleared
+  /// once reads succeed again — lets the UI tell "no trips" apart from
+  /// "trips failed to load."
+  String? get loadError => _loadError;
 
   TripModel? byId(String id) {
     for (final t in _trips) {
@@ -97,6 +108,7 @@ class TripProvider extends ChangeNotifier {
   @override
   void dispose() {
     _subscription?.cancel();
+    _errorSubscription?.cancel();
     super.dispose();
   }
 }
