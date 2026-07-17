@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../core/theme/text_styles.dart';
+import '../core/utils/linkify_text.dart';
 import '../models/note_model.dart';
 import 'tag_chip.dart';
 
@@ -83,11 +84,20 @@ class _NotePreviewSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (note.body.isNotEmpty)
-                        Text(
-                          note.body,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            color: onSurface.withValues(alpha: 0.8),
+                        SelectableText.rich(
+                          TextSpan(
+                            children: linkify(
+                              note.body,
+                              baseStyle: TextStyle(
+                                fontSize: 13.5,
+                                color: onSurface.withValues(alpha: 0.8),
+                              ),
+                              linkStyle: TextStyle(
+                                fontSize: 13.5,
+                                color: theme.colorScheme.primary,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
                           ),
                         ),
                       if (note.checklist.isNotEmpty) ...[

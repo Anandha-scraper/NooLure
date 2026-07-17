@@ -229,10 +229,22 @@ class ProfileScreen extends StatelessWidget {
             height: 46,
             leading: const Icon(LucideIcons.logOut, size: 16),
             onPressed: () async {
+              final auth = context.read<AuthProvider>();
+              final signedOut = await auth.signOut();
+              if (!context.mounted) return;
+              if (!signedOut) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      auth.errorMessage ?? 'Could not sign out',
+                    ),
+                  ),
+                );
+                return;
+              }
               // Unwind to the root, which is AuthGate — it watches
               // AuthProvider and swaps itself to Login on sign-out.
               Navigator.of(context).popUntil((route) => route.isFirst);
-              await context.read<AuthProvider>().signOut();
             },
           ),
           const SizedBox(height: 10),

@@ -41,6 +41,7 @@ class NoteModel {
     this.isPinned = false,
     this.checklist = const [],
     this.deletedAt,
+    this.archivedAt,
   });
 
   final String id;
@@ -56,7 +57,12 @@ class NoteModel {
   /// Non-null when the note has been moved to trash.
   final DateTime? deletedAt;
 
+  /// Non-null when the note has been archived — hidden from the main list
+  /// without being deleted, same nullable-timestamp shape as [deletedAt].
+  final DateTime? archivedAt;
+
   bool get isDeleted => deletedAt != null;
+  bool get isArchived => archivedAt != null;
 
   /// 'just now' / '2h ago' / 'Mar 3' — derived, never stored.
   String get editedLabel => DateLabels.relativeLabel(updatedAt);
@@ -71,6 +77,8 @@ class NoteModel {
     DateTime? updatedAt,
     DateTime? deletedAt,
     bool clearDeletedAt = false,
+    DateTime? archivedAt,
+    bool clearArchivedAt = false,
   }) => NoteModel(
     id: id,
     title: title ?? this.title,
@@ -82,6 +90,7 @@ class NoteModel {
     createdAt: createdAt,
     updatedAt: updatedAt ?? DateTime.now(),
     deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
+    archivedAt: clearArchivedAt ? null : (archivedAt ?? this.archivedAt),
   );
 
   Map<String, dynamic> toJson() => {
@@ -95,6 +104,7 @@ class NoteModel {
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'deletedAt': deletedAt?.toIso8601String(),
+    'archivedAt': archivedAt?.toIso8601String(),
   };
 
   factory NoteModel.fromJson(Map<String, dynamic> json) {
@@ -113,6 +123,7 @@ class NoteModel {
       createdAt: created,
       updatedAt: _parseDate(json['updatedAt']) ?? created,
       deletedAt: _parseDate(json['deletedAt']),
+      archivedAt: _parseDate(json['archivedAt']),
     );
   }
 }

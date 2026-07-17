@@ -16,7 +16,7 @@ class NoteProvider extends ChangeNotifier {
 
   void _apply(List<NoteModel> notes) {
     _allNotes = notes;
-    _notes = notes.where((n) => !n.isDeleted).toList()
+    _notes = notes.where((n) => !n.isDeleted && !n.isArchived).toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     notifyListeners();
   }
@@ -125,6 +125,29 @@ class NoteProvider extends ChangeNotifier {
     for (final n in trashedNotes) {
       await _repository.delete(n.id);
     }
+  }
+
+  List<NoteModel> get archivedNotes {
+    final archived = _allNotes
+        .where((n) => n.isArchived && !n.isDeleted)
+        .toList();
+    archived.sort((a, b) => b.archivedAt!.compareTo(a.archivedAt!));
+    return archived;
+  }
+
+  int get archiveCount =>
+      _allNotes.where((n) => n.isArchived && !n.isDeleted).length;
+
+  Future<void> archiveNote(String id) async {
+    final note = _findInAll(id);
+    if (note == null) return;
+    await _repository.save(note.copyWith(archivedAt: DateTime.now()));
+  }
+
+  Future<void> unarchiveNote(String id) async {
+    final note = _findInAll(id);
+    if (note == null) return;
+    await _repository.save(note.copyWith(clearArchivedAt: true));
   }
 
   NoteModel? _findInAll(String id) {
