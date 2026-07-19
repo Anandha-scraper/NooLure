@@ -243,15 +243,20 @@ class _NoteRowState extends State<_NoteRow> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final Widget content;
     if (_pending != null) {
       content = InlineConfirmCard(
-        message: _pending == _NotePendingAction.archive
-            ? 'Archive "${widget.noteTitle}"?'
-            : 'Move "${widget.noteTitle}" to trash?',
-        confirmLabel: _pending == _NotePendingAction.archive
-            ? 'Archive'
-            : 'Delete',
+        actionIcon: _pending == _NotePendingAction.archive
+            ? LucideIcons.archive
+            : LucideIcons.trash2,
+        actionColor: _pending == _NotePendingAction.archive
+            ? AppColors.accent2
+            : theme.colorScheme.error,
+        actionLabel: _pending == _NotePendingAction.archive
+            ? 'Archive "${widget.noteTitle}"'
+            : 'Move "${widget.noteTitle}" to trash',
+        height: widget.expand ? null : 100,
         onConfirm: () {
           if (_pending == _NotePendingAction.archive) {
             widget.provider.archiveNote(widget.noteId);

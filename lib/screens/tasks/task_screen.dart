@@ -242,12 +242,16 @@ class _TaskRowState extends State<_TaskRow> {
       padding: const EdgeInsets.only(bottom: 10),
       child: _pending != null
           ? InlineConfirmCard(
-              message: _pending == _PendingAction.done
-                  ? 'Mark "${task.title}" as done?'
-                  : 'Move "${task.title}" to trash?',
-              confirmLabel: _pending == _PendingAction.done
-                  ? 'Done'
-                  : 'Delete',
+              actionIcon: _pending == _PendingAction.done
+                  ? LucideIcons.check
+                  : LucideIcons.trash2,
+              actionColor: _pending == _PendingAction.done
+                  ? AppColors.accent2
+                  : theme.colorScheme.error,
+              actionLabel: _pending == _PendingAction.done
+                  ? 'Mark "${task.title}" as done'
+                  : 'Move "${task.title}" to trash',
+              height: 76,
               onConfirm: () {
                 if (_pending == _PendingAction.done) {
                   widget.provider.toggleDone(task.id);

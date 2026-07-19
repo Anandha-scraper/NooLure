@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import 'card_container.dart';
+import '../core/constants/app_colors.dart';
 
-/// A swipe-reveal background — a colored, rounded strip with a single icon,
+/// Swipe-reveal background — a colored, rounded strip with a single icon,
 /// aligned to whichever edge the swipe is coming from. Shared by every
-/// `Dismissible` in the app so they all look the same mid-swipe.
+/// `Dismissible` in the app so they all look the same mid-swipe (before the
+/// threshold arms a pending action and swaps in [InlineConfirmCard]).
 Widget swipeBackground({
   required Alignment alignment,
   required Color color,
@@ -22,41 +24,119 @@ Widget swipeBackground({
   );
 }
 
-/// Replaces a popped-up `AlertDialog` confirmation with one that lives
-/// inside the card itself — shown in place of the normal row content once a
-/// swipe (or other trigger) has armed a pending action.
+/// Replaces a swiped card once an action is armed: the card itself splits
+/// top/bottom instead of popping a dialog or showing a button row. Top half
+/// always cancels (X), bottom half is the specific action alone — icon-only,
+/// so there's nothing that can overflow regardless of how narrow the card is
+/// (unlike the old Cancel/Confirm button row, which broke in the notes grid).
 class InlineConfirmCard extends StatelessWidget {
   const InlineConfirmCard({
     super.key,
-    required this.message,
-    required this.confirmLabel,
+    required this.actionIcon,
+    required this.actionColor,
+    required this.actionLabel,
     required this.onConfirm,
     required this.onCancel,
+    this.height,
   });
 
-  final String message;
-  final String confirmLabel;
+  /// Icon for the bottom half, e.g. LucideIcons.check / .trash2 / .archive /
+  /// .archiveRestore.
+  final IconData actionIcon;
+
+  /// Base semantic color the bottom half's fill/ink are derived from via
+  /// [AppColors.softFill]/[AppColors.softInk] — [AppColors.accent2] for
+  /// positive actions (done/archive/restore), the theme's error color for
+  /// destructive ones.
+  final Color actionColor;
+
+  /// Screen-reader-only description of the bottom action (e.g. 'Archive
+  /// "Grocery list"'). Not rendered as visible text — icon-only by design.
+  final String actionLabel;
+
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
 
+  /// Bounds the card's height when the parent doesn't already provide a tight
+  /// constraint. Leave null only when the parent already constrains height
+  /// tightly (e.g. a grid cell wrapped in SizedBox.expand) — the Column of
+  /// two Expanded halves needs a bounded height from somewhere.
+  final double? height;
+
   @override
   Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final theme = Theme.of(context);
+    final brightness = theme.brightness;
 
-    return CardContainer(
-      elevation: CardElevation.sm,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
+    final cancelFill = theme.cardTheme.color ?? theme.colorScheme.surface;
+    final cancelInk = theme.colorScheme.onSurface.withValues(alpha: 0.55);
+    final actionFill = AppColors.softFill(actionColor, brightness);
+    final actionInk = AppColors.softInk(actionColor, brightness);
+    final divider = theme.dividerColor.withValues(alpha: 0.4);
+
+    final split = ClipRRect(
+      borderRadius: BorderRadius.circular(32),
+      child: Column(
         children: [
           Expanded(
-            child: Text(
-              message,
-              style: TextStyle(fontSize: 13.5, color: onSurface),
+            child: _ConfirmHalf(
+              icon: LucideIcons.x,
+              background: cancelFill,
+              iconColor: cancelInk,
+              semanticLabel: 'Cancel',
+              onTap: onCancel,
             ),
           ),
-          TextButton(onPressed: onCancel, child: const Text('Cancel')),
-          FilledButton(onPressed: onConfirm, child: Text(confirmLabel)),
+          Container(height: 1, color: divider),
+          Expanded(
+            child: _ConfirmHalf(
+              icon: actionIcon,
+              background: actionFill,
+              iconColor: actionInk,
+              semanticLabel: actionLabel,
+              onTap: onConfirm,
+            ),
+          ),
         ],
+      ),
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: AppColors.shadowSm(brightness),
+      ),
+      child: height == null ? split : SizedBox(height: height, child: split),
+    );
+  }
+}
+
+class _ConfirmHalf extends StatelessWidget {
+  const _ConfirmHalf({
+    required this.icon,
+    required this.background,
+    required this.iconColor,
+    required this.semanticLabel,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color background;
+  final Color iconColor;
+  final String semanticLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: Material(
+        color: background,
+        child: InkWell(
+          onTap: onTap,
+          child: Center(child: Icon(icon, color: iconColor, size: 22)),
+        ),
       ),
     );
   }

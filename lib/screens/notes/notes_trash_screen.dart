@@ -7,7 +7,7 @@ import '../../core/utils/date_labels.dart';
 import '../../models/note_model.dart';
 import '../../providers/note_provider.dart';
 import '../../widgets/app_scaffold.dart';
-import '../../widgets/confirm_delete_dialog.dart';
+import '../../widgets/inline_confirm_card.dart';
 import '../../widgets/tag_chip.dart';
 
 class NotesTrashScreen extends StatelessWidget {
@@ -56,51 +56,108 @@ class NotesTrashScreen extends StatelessWidget {
           : ListView.builder(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
               itemCount: trashed.length,
-              itemBuilder: (context, i) => _trashTile(
-                context,
-                theme,
-                provider,
-                trashed[i],
+              itemBuilder: (context, i) => _NotesTrashRow(
+                note: trashed[i],
+                provider: provider,
               ),
             ),
     );
   }
 
-  Widget _trashTile(
+  Future<void> _confirmEmptyTrash(
     BuildContext context,
-    ThemeData theme,
     NoteProvider provider,
-    NoteModel note,
-  ) {
+    int count,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Permanently delete $count ${count == 1 ? 'note' : 'notes'}?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              provider.emptyTrash();
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text('Delete all'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _PendingAction { restore, delete }
+
+class _NotesTrashRow extends StatefulWidget {
+  const _NotesTrashRow({required this.note, required this.provider});
+
+  final NoteModel note;
+  final NoteProvider provider;
+
+  @override
+  State<_NotesTrashRow> createState() => _NotesTrashRowState();
+}
+
+class _NotesTrashRowState extends State<_NotesTrashRow> {
+  _PendingAction? _pending;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
+    final note = widget.note;
+    final provider = widget.provider;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Dismissible(
+      child: _pending != null
+          ? InlineConfirmCard(
+              actionIcon: _pending == _PendingAction.restore
+                  ? LucideIcons.archiveRestore
+                  : LucideIcons.trash2,
+              actionColor: _pending == _PendingAction.restore
+                  ? AppColors.accent2
+                  : theme.colorScheme.error,
+              actionLabel: _pending == _PendingAction.restore
+                  ? 'Restore "${note.title}"'
+                  : 'Permanently delete "${note.title}"',
+              height: 78,
+              onConfirm: () {
+                if (_pending == _PendingAction.restore) {
+                  _restore(context, provider, note);
+                } else {
+                  provider.permanentlyDeleteNote(note.id);
+                }
+                setState(() => _pending = null);
+              },
+              onCancel: () => setState(() => _pending = null),
+            )
+          : Dismissible(
         key: ValueKey(note.id),
-        background: _swipeBg(
+        background: swipeBackground(
           alignment: Alignment.centerLeft,
           color: AppColors.softFill(AppColors.accent2, theme.brightness),
           icon: LucideIcons.archiveRestore,
           iconColor: AppColors.softInk(AppColors.accent2, theme.brightness),
         ),
-        secondaryBackground: _swipeBg(
+        secondaryBackground: swipeBackground(
           alignment: Alignment.centerRight,
           color: theme.colorScheme.error.withValues(alpha: 0.15),
           icon: LucideIcons.trash2,
           iconColor: theme.colorScheme.error,
         ),
         confirmDismiss: (direction) async {
-          if (direction == DismissDirection.startToEnd) {
-            _restore(context, provider, note);
-          } else {
-            await confirmDeleteTask(
-              context,
-              title: note.title,
-              onConfirm: () => provider.permanentlyDeleteNote(note.id),
-              permanent: true,
-            );
-          }
+          setState(() {
+            _pending = direction == DismissDirection.startToEnd
+                ? _PendingAction.restore
+                : _PendingAction.delete;
+          });
           return false;
         },
         child: DecoratedBox(
@@ -163,54 +220,11 @@ class NotesTrashScreen extends StatelessWidget {
     );
   }
 
-  void _restore(BuildContext context, NoteProvider provider, NoteModel note) {
-    provider.restoreNote(note.id);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Note restored')));
-  }
+}
 
-  Future<void> _confirmEmptyTrash(
-    BuildContext context,
-    NoteProvider provider,
-    int count,
-  ) async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Permanently delete $count ${count == 1 ? 'note' : 'notes'}?'),
-        content: const Text('This cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              provider.emptyTrash();
-              Navigator.of(dialogContext).pop();
-            },
-            child: const Text('Delete all'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _swipeBg({
-    required Alignment alignment,
-    required Color color,
-    required IconData icon,
-    required Color iconColor,
-  }) {
-    return Container(
-      alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(32),
-      ),
-      child: Icon(icon, color: iconColor),
-    );
-  }
+void _restore(BuildContext context, NoteProvider provider, NoteModel note) {
+  provider.restoreNote(note.id);
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(const SnackBar(content: Text('Note restored')));
 }

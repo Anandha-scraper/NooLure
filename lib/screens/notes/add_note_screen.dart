@@ -9,8 +9,6 @@ import '../../core/utils/known_categories.dart';
 import '../../models/note_model.dart';
 import '../../providers/note_provider.dart';
 import '../../widgets/app_scaffold.dart';
-import '../../widgets/custom_textfield.dart';
-import '../../widgets/tag_chip.dart';
 import '../../widgets/tag_input_field.dart';
 
 /// Add/edit note screen — a `noteId` puts it in edit mode, pre-filling and
@@ -121,19 +119,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     });
   }
 
-  Future<void> _openFullscreen() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => _FullscreenNoteEditor(
-          titleController: _titleController,
-          bodyController: _bodyController,
-          tagController: _tagController,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
@@ -158,118 +143,45 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           ),
         ),
       ],
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-        children: [
-          Text('Title', style: TextStyles.sectionLabel(color: onSurface)),
-          const SizedBox(height: 8),
-          CustomTextField(controller: _titleController, hintText: 'Note title'),
-          const SizedBox(height: 18),
-          Text('Tag', style: TextStyles.sectionLabel(color: onSurface)),
-          const SizedBox(height: 8),
-          TagInputField(
-            controller: _tagController,
-            suggestions: knownCategories(context),
-            hintText: 'Tag',
-          ),
-          const SizedBox(height: 18),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Body', style: TextStyles.sectionLabel(color: onSurface)),
-              IconButton(
-                icon: const Icon(Icons.fullscreen),
-                tooltip: 'Fullscreen',
-                onPressed: _openFullscreen,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _titleController,
+              style: TextStyles.heading(size: 20, color: onSurface),
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration.collapsed(hintText: 'Title'),
+            ),
+            const SizedBox(height: 10),
+            TagInputField(
+              controller: _tagController,
+              suggestions: knownCategories(context),
+              hintText: 'Tag',
+              borderless: true,
+            ),
+            const SizedBox(height: 16),
+            Divider(
+              height: 1,
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _bodyController,
+              maxLines: null,
+              minLines: 6,
+              textAlignVertical: TextAlignVertical.top,
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.5,
+                color: onSurface.withValues(alpha: 0.85),
               ),
-            ],
-          ),
-          CustomTextField(
-            controller: _bodyController,
-            hintText: 'Write something…',
-            maxLines: 8,
-            borderRadius: BorderRadius.circular(22),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Maximized editor — shares the same controllers as the normal screen by
-/// reference, so anything typed here is already reflected back on shrink
-/// with no separate merge step, and autosave (whose listeners are attached
-/// to the controllers, not this widget) keeps working unchanged.
-class _FullscreenNoteEditor extends StatelessWidget {
-  const _FullscreenNoteEditor({
-    required this.titleController,
-    required this.bodyController,
-    required this.tagController,
-  });
-
-  final TextEditingController titleController;
-  final TextEditingController bodyController;
-  final TextEditingController tagController;
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.fullscreen_exit),
-          tooltip: 'Shrink',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  ListenableBuilder(
-                    listenable: tagController,
-                    builder: (context, _) {
-                      final tag = tagController.text.trim();
-                      if (tag.isEmpty) return const SizedBox.shrink();
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: TagChip(tag),
-                      );
-                    },
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: titleController,
-                      style: TextStyles.heading(size: 17, color: onSurface),
-                      decoration: const InputDecoration.collapsed(
-                        hintText: 'Title',
-                      ),
-                    ),
-                  ),
-                ],
+              decoration: const InputDecoration.collapsed(
+                hintText: 'Write something…',
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: bodyController,
-                maxLines: null,
-                textAlignVertical: TextAlignVertical.top,
-                style: TextStyle(
-                  fontSize: 15,
-                  height: 1.5,
-                  color: onSurface.withValues(alpha: 0.85),
-                ),
-                decoration: const InputDecoration.collapsed(
-                  hintText: 'Write something…',
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

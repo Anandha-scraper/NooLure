@@ -211,8 +211,10 @@ class _HomeTaskRowState extends State<_HomeTaskRow> {
       padding: const EdgeInsets.only(bottom: 10),
       child: _confirming
           ? InlineConfirmCard(
-              message: 'Mark "${task.title}" as done?',
-              confirmLabel: 'Done',
+              actionIcon: LucideIcons.check,
+              actionColor: AppColors.accent2,
+              actionLabel: 'Mark "${task.title}" as done',
+              height: 56,
               onConfirm: () {
                 widget.provider.toggleDone(task.id);
                 setState(() => _confirming = false);

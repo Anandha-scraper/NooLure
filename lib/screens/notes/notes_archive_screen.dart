@@ -52,20 +52,41 @@ class NotesArchiveScreen extends StatelessWidget {
   }
 }
 
-class _ArchiveRow extends StatelessWidget {
+class _ArchiveRow extends StatefulWidget {
   const _ArchiveRow({required this.note, required this.provider});
 
   final NoteModel note;
   final NoteProvider provider;
 
   @override
+  State<_ArchiveRow> createState() => _ArchiveRowState();
+}
+
+class _ArchiveRowState extends State<_ArchiveRow> {
+  bool _confirming = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
+    final note = widget.note;
+    final provider = widget.provider;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Dismissible(
+      child: _confirming
+          ? InlineConfirmCard(
+              actionIcon: LucideIcons.archiveRestore,
+              actionColor: AppColors.accent2,
+              actionLabel: 'Restore "${note.title}"',
+              height: 78,
+              onConfirm: () {
+                _unarchive(context);
+                setState(() => _confirming = false);
+              },
+              onCancel: () => setState(() => _confirming = false),
+            )
+          : Dismissible(
         key: ValueKey(note.id),
         direction: DismissDirection.startToEnd,
         background: swipeBackground(
@@ -75,7 +96,7 @@ class _ArchiveRow extends StatelessWidget {
           iconColor: AppColors.softInk(AppColors.accent2, theme.brightness),
         ),
         confirmDismiss: (direction) async {
-          _unarchive(context);
+          setState(() => _confirming = true);
           return false;
         },
         child: DecoratedBox(
@@ -139,7 +160,7 @@ class _ArchiveRow extends StatelessWidget {
   }
 
   void _unarchive(BuildContext context) {
-    provider.unarchiveNote(note.id);
+    widget.provider.unarchiveNote(widget.note.id);
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Note unarchived')));

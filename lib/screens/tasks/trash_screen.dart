@@ -104,9 +104,11 @@ void _restore(BuildContext context, TaskProvider provider, TaskModel task) {
   );
 }
 
-/// A trashed task row — restore (swipe-right) stays immediate/unconfirmed
-/// since it's reversible; permanent delete (swipe-left) flips the card into
-/// an inline confirm instead of the old popup.
+enum _PendingAction { restore, delete }
+
+/// A trashed task row — both restore (swipe-right) and permanent delete
+/// (swipe-left) flip the card into an inline confirm instead of firing
+/// immediately or popping a dialog.
 class _TrashRow extends StatefulWidget {
   const _TrashRow({required this.task, required this.provider});
 
@@ -118,7 +120,7 @@ class _TrashRow extends StatefulWidget {
 }
 
 class _TrashRowState extends State<_TrashRow> {
-  bool _confirmingDelete = false;
+  _PendingAction? _pending;
 
   @override
   Widget build(BuildContext context) {
@@ -128,15 +130,27 @@ class _TrashRowState extends State<_TrashRow> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: _confirmingDelete
+      child: _pending != null
           ? InlineConfirmCard(
-              message: 'Permanently delete "${task.title}"? This cannot be undone.',
-              confirmLabel: 'Delete forever',
+              actionIcon: _pending == _PendingAction.restore
+                  ? LucideIcons.archiveRestore
+                  : LucideIcons.trash2,
+              actionColor: _pending == _PendingAction.restore
+                  ? AppColors.accent2
+                  : theme.colorScheme.error,
+              actionLabel: _pending == _PendingAction.restore
+                  ? 'Restore "${task.title}"'
+                  : 'Permanently delete "${task.title}"',
+              height: 78,
               onConfirm: () {
-                widget.provider.permanentlyDeleteTask(task.id);
-                setState(() => _confirmingDelete = false);
+                if (_pending == _PendingAction.restore) {
+                  _restore(context, widget.provider, task);
+                } else {
+                  widget.provider.permanentlyDeleteTask(task.id);
+                }
+                setState(() => _pending = null);
               },
-              onCancel: () => setState(() => _confirmingDelete = false),
+              onCancel: () => setState(() => _pending = null),
             )
           : Dismissible(
               key: ValueKey(task.id),
@@ -153,11 +167,11 @@ class _TrashRowState extends State<_TrashRow> {
                 iconColor: theme.colorScheme.error,
               ),
               confirmDismiss: (direction) async {
-                if (direction == DismissDirection.startToEnd) {
-                  _restore(context, widget.provider, task);
-                } else {
-                  setState(() => _confirmingDelete = true);
-                }
+                setState(() {
+                  _pending = direction == DismissDirection.startToEnd
+                      ? _PendingAction.restore
+                      : _PendingAction.delete;
+                });
                 return false;
               },
               child: DecoratedBox(
