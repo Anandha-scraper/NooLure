@@ -110,15 +110,31 @@ class AuthProvider extends ChangeNotifier {
     await SyncService.instance.pushProfileName(trimmed);
   }
 
-  Future<void> signOut() async {
+  /// Returns `false` (without signing out) if there's a write from this
+  /// session still unsynced and no connection to flush it — switching
+  /// accounts while that's true would either lose the change or, worse,
+  /// merge it into the next signed-in account's local data. See
+  /// [LocalStore.clearAll], which this calls on an actual sign-out so the
+  /// next account doesn't inherit this one's on-device tasks/notes.
+  Future<bool> signOut() async {
+    if (SyncService.instance.hasPendingWrites && !SyncService.instance.isOnline) {
+      errorMessage =
+          "You have changes that haven't synced yet — connect to the "
+          'internet before switching accounts.';
+      notifyListeners();
+      return false;
+    }
+
     await _authService.signOut();
     await SyncService.instance.unbind();
     await TripSyncService.instance.unbind();
+    await LocalStore.clearAll();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_sessionKey, false);
     currentUser = null;
     status = AuthStatus.unauthenticated;
     notifyListeners();
+    return true;
   }
 
   /// Permanently deletes the account and all of its data — remote mirror

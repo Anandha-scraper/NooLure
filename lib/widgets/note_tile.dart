@@ -139,6 +139,8 @@ class PinnedNoteCard extends StatelessWidget {
               // Caprasimo, matching NoteTile's title — these two cards sit
               // side by side and used to render the same element in different
               // typefaces.
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyles.heading(size: 17, color: ink),
             ),
             const SizedBox(height: 6),

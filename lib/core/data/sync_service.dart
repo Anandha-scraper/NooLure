@@ -28,9 +28,22 @@ class SyncService {
   String? _userId;
   final Map<String, Repository<dynamic>> _repositories = {};
   final List<StreamSubscription<DatabaseEvent>> _subscriptions = [];
+  bool _online = true;
+  int _pendingWrites = 0;
 
   bool get isEnabled => _root != null;
   bool get isSyncing => isEnabled && _userId != null;
+
+  /// Whether this device currently has a live connection to the Firebase
+  /// backend — backed by RTDB's own `.info/connected` special path, so no
+  /// extra connectivity package is needed.
+  bool get isOnline => _online;
+
+  /// Whether a push from this session is still in flight (not yet
+  /// server-acked). Only tracks writes made since this app launch — it
+  /// can't see a write Firebase's disk persistence queued in a prior
+  /// session that never got a chance to flush.
+  bool get hasPendingWrites => _pendingWrites > 0;
 
   /// Exposes the shared root reference so other services (e.g. trips, which
   /// live outside the per-user `/users/<uid>` tree this class owns) can reuse
@@ -47,6 +60,11 @@ class SyncService {
       // offline are queued and flushed on reconnect.
       db.setPersistenceEnabled(true);
       _root = db.ref();
+      // Lives for the whole app process — never cancelled, same as this
+      // singleton itself never disposes.
+      db.ref('.info/connected').onValue.listen((event) {
+        _online = event.snapshot.value == true;
+      });
     } catch (error) {
       _root = null;
       debugPrint(
@@ -99,7 +117,12 @@ class SyncService {
       final remoteRecord = remote[entry.key];
       if (remoteRecord == null ||
           _updatedAt(entry.value).isAfter(_updatedAt(remoteRecord))) {
-        await ref.child(entry.key).set(entry.value);
+        _pendingWrites++;
+        try {
+          await ref.child(entry.key).set(entry.value);
+        } finally {
+          _pendingWrites--;
+        }
       }
     }
   }
@@ -124,11 +147,25 @@ class SyncService {
     String id,
     Map<String, dynamic> json,
   ) async {
-    await _collectionRef(collection)?.child(id).set(json);
+    final ref = _collectionRef(collection)?.child(id);
+    if (ref == null) return;
+    _pendingWrites++;
+    try {
+      await ref.set(json);
+    } finally {
+      _pendingWrites--;
+    }
   }
 
   Future<void> pushDelete(String collection, String id) async {
-    await _collectionRef(collection)?.child(id).remove();
+    final ref = _collectionRef(collection)?.child(id);
+    if (ref == null) return;
+    _pendingWrites++;
+    try {
+      await ref.remove();
+    } finally {
+      _pendingWrites--;
+    }
   }
 
   Future<void> pushProfileName(String name) async {

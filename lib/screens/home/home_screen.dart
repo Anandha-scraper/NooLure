@@ -7,14 +7,15 @@ import '../../core/constants/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/text_styles.dart';
 import '../../models/birthday_model.dart';
+import '../../models/task_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/birthday_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/avatar_circle.dart';
 import '../../widgets/card_container.dart';
-import '../../widgets/confirm_done_dialog.dart';
-import '../../widgets/custom_button.dart';
+import '../../widgets/home_fab.dart';
+import '../../widgets/inline_confirm_card.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/segmented_control.dart';
 import '../../widgets/task_preview_sheet.dart';
@@ -45,8 +46,11 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       drawer: const AppDrawer(currentRoute: AppRoutes.home),
-      floatingActionButton: AppFab(
-        onPressed: () => Navigator.of(context).pushNamed(AppRoutes.addTask),
+      floatingActionButton: HomeFab(
+        onTask: () => Navigator.of(context).pushNamed(AppRoutes.addTask),
+        onNote: () => Navigator.of(context).pushNamed(AppRoutes.addNote),
+        onBirthday: () =>
+            Navigator.of(context).pushNamed(AppRoutes.addBirthday),
       ),
       body: SafeArea(
         child: ListView(
@@ -151,54 +155,7 @@ class HomeScreen extends StatelessWidget {
               const _EmptyHint('Nothing on your plate — tap + to add a task')
             else
               for (final task in tasks.homeTasks)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Dismissible(
-                    key: ValueKey(task.id),
-                    background: _swipeBackground(
-                      alignment: Alignment.centerLeft,
-                      color: AppColors.softFill(
-                        AppColors.accent2,
-                        theme.brightness,
-                      ),
-                      icon: LucideIcons.check,
-                      iconColor: AppColors.softInk(
-                        AppColors.accent2,
-                        theme.brightness,
-                      ),
-                    ),
-                    secondaryBackground: _swipeBackground(
-                      alignment: Alignment.centerRight,
-                      color: AppColors.softFill(
-                        theme.colorScheme.primary,
-                        theme.brightness,
-                      ),
-                      icon: LucideIcons.eye,
-                      iconColor: AppColors.softInk(
-                        theme.colorScheme.primary,
-                        theme.brightness,
-                      ),
-                    ),
-                    confirmDismiss: (direction) async {
-                      if (direction == DismissDirection.startToEnd) {
-                        await confirmDoneTask(
-                          context,
-                          title: task.title,
-                          onConfirm: () => tasks.toggleDone(task.id),
-                        );
-                      } else {
-                        await showTaskPreview(
-                          context,
-                          task,
-                          onEdit: null,
-                          onToggleDone: () => tasks.toggleDone(task.id),
-                        );
-                      }
-                      return false;
-                    },
-                    child: TaskTile(task: task, dense: true),
-                  ),
-                ),
+                _HomeTaskRow(task: task, provider: tasks),
             if (tasks.homeTasks.isNotEmpty) ...[
               const SizedBox(height: 8),
               Row(
@@ -228,18 +185,85 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-Widget _swipeBackground({
-  required Alignment alignment,
-  required Color color,
-  required IconData icon,
-  required Color iconColor,
-}) {
-  return Container(
-    alignment: alignment,
-    padding: const EdgeInsets.symmetric(horizontal: 24),
-    decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(32)),
-    child: Icon(icon, color: iconColor),
-  );
+/// Today's swipeable task row — swipe-right marks done, but instead of a
+/// popup confirmation the card itself flips into an inline confirm/cancel
+/// row (see [InlineConfirmCard]); swipe-left still opens the preview sheet
+/// directly, since that's not a destructive action.
+class _HomeTaskRow extends StatefulWidget {
+  const _HomeTaskRow({required this.task, required this.provider});
+
+  final TaskModel task;
+  final TaskProvider provider;
+
+  @override
+  State<_HomeTaskRow> createState() => _HomeTaskRowState();
+}
+
+class _HomeTaskRowState extends State<_HomeTaskRow> {
+  bool _confirming = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final task = widget.task;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: _confirming
+          ? InlineConfirmCard(
+              actionIcon: LucideIcons.check,
+              actionColor: AppColors.accent2,
+              actionLabel: 'Mark "${task.title}" as done',
+              height: 56,
+              onConfirm: () {
+                widget.provider.toggleDone(task.id);
+                setState(() => _confirming = false);
+              },
+              onCancel: () => setState(() => _confirming = false),
+            )
+          : Dismissible(
+              key: ValueKey(task.id),
+              background: swipeBackground(
+                alignment: Alignment.centerLeft,
+                color: AppColors.softFill(
+                  AppColors.accent2,
+                  theme.brightness,
+                ),
+                icon: LucideIcons.check,
+                iconColor: AppColors.softInk(
+                  AppColors.accent2,
+                  theme.brightness,
+                ),
+              ),
+              secondaryBackground: swipeBackground(
+                alignment: Alignment.centerRight,
+                color: AppColors.softFill(
+                  theme.colorScheme.primary,
+                  theme.brightness,
+                ),
+                icon: LucideIcons.eye,
+                iconColor: AppColors.softInk(
+                  theme.colorScheme.primary,
+                  theme.brightness,
+                ),
+              ),
+              confirmDismiss: (direction) async {
+                if (direction == DismissDirection.startToEnd) {
+                  setState(() => _confirming = true);
+                } else {
+                  await showTaskPreview(
+                    context,
+                    task,
+                    onEdit: null,
+                    onToggleDone: () => widget.provider.toggleDone(task.id),
+                  );
+                }
+                return false;
+              },
+              child: TaskTile(task: task, dense: true),
+            ),
+    );
+  }
 }
 
 class _SectionHeader extends StatelessWidget {

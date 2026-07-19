@@ -28,6 +28,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   DateTime? _dueAt;
   TaskPriority _priority = TaskPriority.medium;
   TaskRepeat _repeat = TaskRepeat.none;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -99,7 +100,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             listenable: _titleController,
             builder: (context, _) => PrimaryButton(
               label: 'Add task',
-              onPressed: _titleController.text.trim().isEmpty ? null : _submit,
+              onPressed: _saving || _titleController.text.trim().isEmpty
+                  ? null
+                  : _submit,
             ),
           ),
         ],
@@ -122,6 +125,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   }
 
   Future<void> _submit() async {
+    if (_saving) return;
     final dueAt = _dueAt;
     if (dueAt != null && dueAt.isBefore(DateTime.now())) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -133,6 +137,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     }
     final navigator = Navigator.of(context);
     final category = _categoryController.text.trim();
+    setState(() => _saving = true);
     await context.read<TaskProvider>().addTask(
       title: _titleController.text.trim(),
       dueAt: _dueAt,
@@ -141,6 +146,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       description: _descriptionController.text.trim(),
       repeat: _repeat,
     );
+    if (!mounted) return;
+    setState(() => _saving = false);
     navigator.pop();
   }
 }

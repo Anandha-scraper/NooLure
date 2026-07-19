@@ -7,7 +7,7 @@ import '../../core/utils/date_labels.dart';
 import '../../models/task_model.dart';
 import '../../providers/task_provider.dart';
 import '../../widgets/app_scaffold.dart';
-import '../../widgets/confirm_delete_dialog.dart';
+import '../../widgets/inline_confirm_card.dart';
 import '../../widgets/tag_chip.dart';
 
 class TrashScreen extends StatelessWidget {
@@ -56,129 +56,9 @@ class TrashScreen extends StatelessWidget {
           : ListView.builder(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
               itemCount: trashed.length,
-              itemBuilder: (context, i) => _trashTile(
-                context,
-                theme,
-                provider,
-                trashed[i],
-              ),
+              itemBuilder: (context, i) =>
+                  _TrashRow(task: trashed[i], provider: provider),
             ),
-    );
-  }
-
-  Widget _trashTile(
-    BuildContext context,
-    ThemeData theme,
-    TaskProvider provider,
-    TaskModel task,
-  ) {
-    final onSurface = theme.colorScheme.onSurface;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Dismissible(
-        key: ValueKey(task.id),
-        background: _swipeBg(
-          alignment: Alignment.centerLeft,
-          color: AppColors.softFill(AppColors.accent2, theme.brightness),
-          icon: LucideIcons.archiveRestore,
-          iconColor: AppColors.softInk(AppColors.accent2, theme.brightness),
-        ),
-        secondaryBackground: _swipeBg(
-          alignment: Alignment.centerRight,
-          color: theme.colorScheme.error.withValues(alpha: 0.15),
-          icon: LucideIcons.trash2,
-          iconColor: theme.colorScheme.error,
-        ),
-        confirmDismiss: (direction) async {
-          if (direction == DismissDirection.startToEnd) {
-            _restore(context, provider, task);
-          } else {
-            await confirmDeleteTask(
-              context,
-              title: task.title,
-              onConfirm: () => provider.permanentlyDeleteTask(task.id),
-              permanent: true,
-            );
-          }
-          return false;
-        },
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            boxShadow: AppColors.shadowSm(theme.brightness),
-          ),
-          child: Material(
-            color: theme.cardTheme.color,
-            borderRadius: BorderRadius.circular(32),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          task.title,
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            color: onSurface,
-                            decoration: task.done
-                                ? TextDecoration.lineThrough
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 8,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              'Deleted ${DateLabels.relativeLabel(task.deletedAt!)}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: onSurface.withValues(alpha: 0.55),
-                              ),
-                            ),
-                            TagChip(task.category),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      LucideIcons.archiveRestore,
-                      size: 18,
-                      color: AppColors.accentInk(
-                        theme.colorScheme.primary,
-                        theme.brightness,
-                      ),
-                    ),
-                    tooltip: 'Restore',
-                    onPressed: () => _restore(context, provider, task),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _restore(BuildContext context, TaskProvider provider, TaskModel task) {
-    final hadPastDue =
-        task.dueAt != null && task.dueAt!.isBefore(DateTime.now());
-    provider.restoreTask(task.id);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          hadPastDue ? 'Task restored — due date set to now' : 'Task restored',
-        ),
-      ),
     );
   }
 
@@ -209,20 +89,158 @@ class TrashScreen extends StatelessWidget {
     );
   }
 
-  Widget _swipeBg({
-    required Alignment alignment,
-    required Color color,
-    required IconData icon,
-    required Color iconColor,
-  }) {
-    return Container(
-      alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(32),
+}
+
+void _restore(BuildContext context, TaskProvider provider, TaskModel task) {
+  final hadPastDue =
+      task.dueAt != null && task.dueAt!.isBefore(DateTime.now());
+  provider.restoreTask(task.id);
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        hadPastDue ? 'Task restored — due date set to now' : 'Task restored',
       ),
-      child: Icon(icon, color: iconColor),
+    ),
+  );
+}
+
+enum _PendingAction { restore, delete }
+
+/// A trashed task row — both restore (swipe-right) and permanent delete
+/// (swipe-left) flip the card into an inline confirm instead of firing
+/// immediately or popping a dialog.
+class _TrashRow extends StatefulWidget {
+  const _TrashRow({required this.task, required this.provider});
+
+  final TaskModel task;
+  final TaskProvider provider;
+
+  @override
+  State<_TrashRow> createState() => _TrashRowState();
+}
+
+class _TrashRowState extends State<_TrashRow> {
+  _PendingAction? _pending;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final task = widget.task;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: _pending != null
+          ? InlineConfirmCard(
+              actionIcon: _pending == _PendingAction.restore
+                  ? LucideIcons.archiveRestore
+                  : LucideIcons.trash2,
+              actionColor: _pending == _PendingAction.restore
+                  ? AppColors.accent2
+                  : theme.colorScheme.error,
+              actionLabel: _pending == _PendingAction.restore
+                  ? 'Restore "${task.title}"'
+                  : 'Permanently delete "${task.title}"',
+              height: 78,
+              onConfirm: () {
+                if (_pending == _PendingAction.restore) {
+                  _restore(context, widget.provider, task);
+                } else {
+                  widget.provider.permanentlyDeleteTask(task.id);
+                }
+                setState(() => _pending = null);
+              },
+              onCancel: () => setState(() => _pending = null),
+            )
+          : Dismissible(
+              key: ValueKey(task.id),
+              background: swipeBackground(
+                alignment: Alignment.centerLeft,
+                color: AppColors.softFill(AppColors.accent2, theme.brightness),
+                icon: LucideIcons.archiveRestore,
+                iconColor: AppColors.softInk(AppColors.accent2, theme.brightness),
+              ),
+              secondaryBackground: swipeBackground(
+                alignment: Alignment.centerRight,
+                color: theme.colorScheme.error.withValues(alpha: 0.15),
+                icon: LucideIcons.trash2,
+                iconColor: theme.colorScheme.error,
+              ),
+              confirmDismiss: (direction) async {
+                setState(() {
+                  _pending = direction == DismissDirection.startToEnd
+                      ? _PendingAction.restore
+                      : _PendingAction.delete;
+                });
+                return false;
+              },
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(32),
+                  boxShadow: AppColors.shadowSm(theme.brightness),
+                ),
+                child: Material(
+                  color: theme.cardTheme.color,
+                  borderRadius: BorderRadius.circular(32),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                task.title,
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  color: onSurface,
+                                  decoration: task.done
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 8,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    'Deleted ${DateLabels.relativeLabel(task.deletedAt!)}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: onSurface.withValues(alpha: 0.55),
+                                    ),
+                                  ),
+                                  TagChip(task.category),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            LucideIcons.archiveRestore,
+                            size: 18,
+                            color: AppColors.accentInk(
+                              theme.colorScheme.primary,
+                              theme.brightness,
+                            ),
+                          ),
+                          tooltip: 'Restore',
+                          onPressed: () =>
+                              _restore(context, widget.provider, task),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
     );
   }
 }

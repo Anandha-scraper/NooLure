@@ -9,9 +9,8 @@ import '../../models/task_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../widgets/app_scaffold.dart';
-import '../../widgets/confirm_delete_dialog.dart';
-import '../../widgets/confirm_done_dialog.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/inline_confirm_card.dart';
 import '../../widgets/tag_chip.dart';
 import '../../widgets/task_preview_sheet.dart';
 import '../../widgets/task_tile.dart';
@@ -123,7 +122,7 @@ class _TaskScreenState extends State<TaskScreen> {
                   ),
                 ),
               for (final task in openTasks)
-                _taskRow(context, theme, provider, task, allowComplete: true),
+                _TaskRow(task: task, provider: provider, allowComplete: true),
               if (openTasks.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Row(
@@ -177,16 +176,23 @@ class _TaskScreenState extends State<TaskScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 10),
-                if (_completedExpanded)
+                if (_completedExpanded) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'long-press to edit · swipe to delete',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: onSurface.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   for (final task in completedTasks)
-                    _taskRow(
-                      context,
-                      theme,
-                      provider,
-                      task,
+                    _TaskRow(
+                      task: task,
+                      provider: provider,
                       allowComplete: false,
                     ),
+                ],
               ],
             ],
           ),
@@ -197,86 +203,113 @@ class _TaskScreenState extends State<TaskScreen> {
     );
   }
 
-  /// A single swipeable, tappable task row — shared by the open and
-  /// completed sections. [allowComplete] gates the complete-swipe direction
-  /// entirely (via [Dismissible.direction], not just hiding a background),
-  /// since a completed task has nothing left to confirm-complete into.
-  Widget _taskRow(
-    BuildContext context,
-    ThemeData theme,
-    TaskProvider provider,
-    TaskModel task, {
-    required bool allowComplete,
-  }) {
+}
+
+enum _PendingAction { done, delete }
+
+/// A single swipeable, tappable task row — shared by the open and completed
+/// sections. [allowComplete] gates the complete-swipe direction entirely (via
+/// [Dismissible.direction], not just hiding a background), since a completed
+/// task has nothing left to confirm-complete into.
+///
+/// Swiping doesn't pop a confirmation dialog — it flips the card itself into
+/// an inline confirm/cancel row, so the confirmation lives in the same card
+/// instead of a separate popup.
+class _TaskRow extends StatefulWidget {
+  const _TaskRow({
+    required this.task,
+    required this.provider,
+    required this.allowComplete,
+  });
+
+  final TaskModel task;
+  final TaskProvider provider;
+  final bool allowComplete;
+
+  @override
+  State<_TaskRow> createState() => _TaskRowState();
+}
+
+class _TaskRowState extends State<_TaskRow> {
+  _PendingAction? _pending;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final task = widget.task;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Dismissible(
-        key: ValueKey(task.id),
-        direction: allowComplete
-            ? DismissDirection.horizontal
-            : DismissDirection.endToStart,
-        background: _swipeBackground(
-          alignment: Alignment.centerLeft,
-          color: AppColors.softFill(AppColors.accent2, theme.brightness),
-          icon: LucideIcons.check,
-          iconColor: AppColors.softInk(AppColors.accent2, theme.brightness),
-        ),
-        secondaryBackground: _swipeBackground(
-          alignment: Alignment.centerRight,
-          color: theme.colorScheme.error.withValues(alpha: 0.15),
-          icon: LucideIcons.trash2,
-          iconColor: theme.colorScheme.error,
-        ),
-        confirmDismiss: (direction) async {
-          if (direction == DismissDirection.startToEnd) {
-            await confirmDoneTask(
-              context,
-              title: task.title,
-              onConfirm: () => provider.toggleDone(task.id),
-            );
-          } else {
-            await confirmDeleteTask(
-              context,
-              title: task.title,
-              onConfirm: () => provider.trashTask(task.id),
-            );
-          }
-          return false;
-        },
-        child: TaskTile(
-          task: task,
-          showDragHandle: true,
-          onToggle: null,
-          onTap: () => showTaskPreview(
-            context,
-            task,
-            onEdit: () => Navigator.of(
-              context,
-            ).pushNamed(AppRoutes.taskDetail, arguments: task.id),
-            onToggleDone: null,
-          ),
-          onLongPress: () => Navigator.of(
-            context,
-          ).pushNamed(AppRoutes.taskDetail, arguments: task.id),
-        ),
-      ),
-    );
-  }
-
-  Widget _swipeBackground({
-    required Alignment alignment,
-    required Color color,
-    required IconData icon,
-    required Color iconColor,
-  }) {
-    return Container(
-      alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(32),
-      ),
-      child: Icon(icon, color: iconColor),
+      child: _pending != null
+          ? InlineConfirmCard(
+              actionIcon: _pending == _PendingAction.done
+                  ? LucideIcons.check
+                  : LucideIcons.trash2,
+              actionColor: _pending == _PendingAction.done
+                  ? AppColors.accent2
+                  : theme.colorScheme.error,
+              actionLabel: _pending == _PendingAction.done
+                  ? 'Mark "${task.title}" as done'
+                  : 'Move "${task.title}" to trash',
+              height: 76,
+              onConfirm: () {
+                if (_pending == _PendingAction.done) {
+                  widget.provider.toggleDone(task.id);
+                } else {
+                  widget.provider.trashTask(task.id);
+                }
+                setState(() => _pending = null);
+              },
+              onCancel: () => setState(() => _pending = null),
+            )
+          : Dismissible(
+              key: ValueKey(task.id),
+              direction: widget.allowComplete
+                  ? DismissDirection.horizontal
+                  : DismissDirection.endToStart,
+              background: swipeBackground(
+                alignment: Alignment.centerLeft,
+                color: AppColors.softFill(
+                  AppColors.accent2,
+                  theme.brightness,
+                ),
+                icon: LucideIcons.check,
+                iconColor: AppColors.softInk(
+                  AppColors.accent2,
+                  theme.brightness,
+                ),
+              ),
+              secondaryBackground: swipeBackground(
+                alignment: Alignment.centerRight,
+                color: theme.colorScheme.error.withValues(alpha: 0.15),
+                icon: LucideIcons.trash2,
+                iconColor: theme.colorScheme.error,
+              ),
+              confirmDismiss: (direction) async {
+                setState(() {
+                  _pending = direction == DismissDirection.startToEnd
+                      ? _PendingAction.done
+                      : _PendingAction.delete;
+                });
+                return false;
+              },
+              child: TaskTile(
+                task: task,
+                showDragHandle: true,
+                onToggle: null,
+                onTap: () => showTaskPreview(
+                  context,
+                  task,
+                  onEdit: () => Navigator.of(
+                    context,
+                  ).pushNamed(AppRoutes.taskDetail, arguments: task.id),
+                  onToggleDone: null,
+                ),
+                onLongPress: () => Navigator.of(
+                  context,
+                ).pushNamed(AppRoutes.taskDetail, arguments: task.id),
+              ),
+            ),
     );
   }
 }

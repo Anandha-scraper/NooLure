@@ -13,18 +13,30 @@ class TagInputField extends StatelessWidget {
     required this.controller,
     required this.suggestions,
     this.hintText,
+    this.borderless = false,
   });
 
   final TextEditingController controller;
   final List<String> suggestions;
   final String? hintText;
 
+  /// Renders the field without the boxed pill border — a plain, collapsed
+  /// TextField instead of [CustomTextField]. Used where the surrounding
+  /// screen is already borderless (e.g. the note editor); leave false to
+  /// keep the default boxed look.
+  final bool borderless;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CustomTextField(controller: controller, hintText: hintText),
+        borderless
+            ? TextField(
+                controller: controller,
+                decoration: InputDecoration.collapsed(hintText: hintText),
+              )
+            : CustomTextField(controller: controller, hintText: hintText),
         ListenableBuilder(
           listenable: controller,
           builder: (context, _) {

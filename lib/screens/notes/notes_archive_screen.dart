@@ -10,41 +10,30 @@ import '../../widgets/app_scaffold.dart';
 import '../../widgets/inline_confirm_card.dart';
 import '../../widgets/tag_chip.dart';
 
-class NotesTrashScreen extends StatelessWidget {
-  const NotesTrashScreen({super.key});
+class NotesArchiveScreen extends StatelessWidget {
+  const NotesArchiveScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<NoteProvider>();
-    final trashed = provider.trashedNotes;
-    final theme = Theme.of(context);
-    final onSurface = theme.colorScheme.onSurface;
+    final archived = provider.archivedNotes;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
 
     return AppScaffold(
-      title: 'Deleted Notes',
-      actions: trashed.isNotEmpty
-          ? [
-              IconButton(
-                icon: const Icon(LucideIcons.trash2),
-                tooltip: 'Empty trash',
-                onPressed: () => _confirmEmptyTrash(context, provider, trashed.length),
-              ),
-              const SizedBox(width: 8),
-            ]
-          : null,
-      body: trashed.isEmpty
+      title: 'Archived Notes',
+      body: archived.isEmpty
           ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    LucideIcons.trash2,
+                    LucideIcons.archive,
                     size: 40,
                     color: onSurface.withValues(alpha: 0.25),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Trash is empty',
+                    'No archived notes',
                     style: TextStyle(
                       fontSize: 14,
                       color: onSurface.withValues(alpha: 0.5),
@@ -55,57 +44,26 @@ class NotesTrashScreen extends StatelessWidget {
             )
           : ListView.builder(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-              itemCount: trashed.length,
-              itemBuilder: (context, i) => _NotesTrashRow(
-                note: trashed[i],
-                provider: provider,
-              ),
+              itemCount: archived.length,
+              itemBuilder: (context, i) =>
+                  _ArchiveRow(note: archived[i], provider: provider),
             ),
-    );
-  }
-
-  Future<void> _confirmEmptyTrash(
-    BuildContext context,
-    NoteProvider provider,
-    int count,
-  ) async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Permanently delete $count ${count == 1 ? 'note' : 'notes'}?'),
-        content: const Text('This cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              provider.emptyTrash();
-              Navigator.of(dialogContext).pop();
-            },
-            child: const Text('Delete all'),
-          ),
-        ],
-      ),
     );
   }
 }
 
-enum _PendingAction { restore, delete }
-
-class _NotesTrashRow extends StatefulWidget {
-  const _NotesTrashRow({required this.note, required this.provider});
+class _ArchiveRow extends StatefulWidget {
+  const _ArchiveRow({required this.note, required this.provider});
 
   final NoteModel note;
   final NoteProvider provider;
 
   @override
-  State<_NotesTrashRow> createState() => _NotesTrashRowState();
+  State<_ArchiveRow> createState() => _ArchiveRowState();
 }
 
-class _NotesTrashRowState extends State<_NotesTrashRow> {
-  _PendingAction? _pending;
+class _ArchiveRowState extends State<_ArchiveRow> {
+  bool _confirming = false;
 
   @override
   Widget build(BuildContext context) {
@@ -116,48 +74,29 @@ class _NotesTrashRowState extends State<_NotesTrashRow> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: _pending != null
+      child: _confirming
           ? InlineConfirmCard(
-              actionIcon: _pending == _PendingAction.restore
-                  ? LucideIcons.archiveRestore
-                  : LucideIcons.trash2,
-              actionColor: _pending == _PendingAction.restore
-                  ? AppColors.accent2
-                  : theme.colorScheme.error,
-              actionLabel: _pending == _PendingAction.restore
-                  ? 'Restore "${note.title}"'
-                  : 'Permanently delete "${note.title}"',
+              actionIcon: LucideIcons.archiveRestore,
+              actionColor: AppColors.accent2,
+              actionLabel: 'Restore "${note.title}"',
               height: 78,
               onConfirm: () {
-                if (_pending == _PendingAction.restore) {
-                  _restore(context, provider, note);
-                } else {
-                  provider.permanentlyDeleteNote(note.id);
-                }
-                setState(() => _pending = null);
+                _unarchive(context);
+                setState(() => _confirming = false);
               },
-              onCancel: () => setState(() => _pending = null),
+              onCancel: () => setState(() => _confirming = false),
             )
           : Dismissible(
         key: ValueKey(note.id),
+        direction: DismissDirection.startToEnd,
         background: swipeBackground(
           alignment: Alignment.centerLeft,
           color: AppColors.softFill(AppColors.accent2, theme.brightness),
           icon: LucideIcons.archiveRestore,
           iconColor: AppColors.softInk(AppColors.accent2, theme.brightness),
         ),
-        secondaryBackground: swipeBackground(
-          alignment: Alignment.centerRight,
-          color: theme.colorScheme.error.withValues(alpha: 0.15),
-          icon: LucideIcons.trash2,
-          iconColor: theme.colorScheme.error,
-        ),
         confirmDismiss: (direction) async {
-          setState(() {
-            _pending = direction == DismissDirection.startToEnd
-                ? _PendingAction.restore
-                : _PendingAction.delete;
-          });
+          setState(() => _confirming = true);
           return false;
         },
         child: DecoratedBox(
@@ -187,7 +126,7 @@ class _NotesTrashRowState extends State<_NotesTrashRow> {
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(
-                              'Deleted ${DateLabels.relativeLabel(note.deletedAt!)}',
+                              'Archived ${DateLabels.relativeLabel(note.archivedAt!)}',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: onSurface.withValues(alpha: 0.55),
@@ -208,8 +147,8 @@ class _NotesTrashRowState extends State<_NotesTrashRow> {
                         theme.brightness,
                       ),
                     ),
-                    tooltip: 'Restore',
-                    onPressed: () => _restore(context, provider, note),
+                    tooltip: 'Unarchive',
+                    onPressed: () => _unarchive(context),
                   ),
                 ],
               ),
@@ -220,11 +159,10 @@ class _NotesTrashRowState extends State<_NotesTrashRow> {
     );
   }
 
-}
-
-void _restore(BuildContext context, NoteProvider provider, NoteModel note) {
-  provider.restoreNote(note.id);
-  ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(const SnackBar(content: Text('Note restored')));
+  void _unarchive(BuildContext context) {
+    widget.provider.unarchiveNote(widget.note.id);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Note unarchived')));
+  }
 }
