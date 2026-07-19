@@ -7,6 +7,7 @@ class AppRoutes {
   static const String taskDetail = '/tasks/detail';
   static const String addTask = '/tasks/add';
   static const String trash = '/tasks/trash';
+  static const String taskArchive = '/tasks/archive';
   static const String notes = '/notes';
   static const String addNote = '/notes/add';
   static const String editNote = '/notes/edit';

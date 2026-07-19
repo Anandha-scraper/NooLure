@@ -4,17 +4,22 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../core/theme/text_styles.dart';
 import '../models/task_model.dart';
 import 'check_circle.dart';
+import 'inline_confirm_card.dart';
 import 'tag_chip.dart';
 
 /// Read-only glance at a task — shown on tap, with an "Edit" affordance for
 /// anyone who doesn't know (or doesn't want to use) the long-press shortcut.
 /// Pass `onEdit: null` to omit that affordance entirely (e.g. Home, where
-/// editing is only reachable from the Tasks page).
+/// editing is only reachable from the Tasks page). `onArchive`/`onTrash`
+/// are likewise optional — when present, tapping either arms an inline
+/// icon-split confirm inside the sheet before actually acting.
 Future<void> showTaskPreview(
   BuildContext context,
   TaskModel task, {
   required VoidCallback? onEdit,
   required VoidCallback? onToggleDone,
+  VoidCallback? onArchive,
+  VoidCallback? onTrash,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -28,25 +33,43 @@ Future<void> showTaskPreview(
               onEdit();
             },
       onToggleDone: onToggleDone,
+      onArchive: onArchive,
+      onTrash: onTrash,
     ),
   );
 }
 
-class _TaskPreviewSheet extends StatelessWidget {
+enum _TaskPendingAction { archive, trash }
+
+class _TaskPreviewSheet extends StatefulWidget {
   const _TaskPreviewSheet({
     required this.task,
     required this.onEdit,
     required this.onToggleDone,
+    this.onArchive,
+    this.onTrash,
   });
 
   final TaskModel task;
   final VoidCallback? onEdit;
   final VoidCallback? onToggleDone;
+  final VoidCallback? onArchive;
+  final VoidCallback? onTrash;
+
+  @override
+  State<_TaskPreviewSheet> createState() => _TaskPreviewSheetState();
+}
+
+class _TaskPreviewSheetState extends State<_TaskPreviewSheet> {
+  _TaskPendingAction? _pending;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
+    final task = widget.task;
+    final hasActions =
+        widget.onEdit != null || widget.onArchive != null || widget.onTrash != null;
 
     return SafeArea(
       child: Padding(
@@ -57,7 +80,7 @@ class _TaskPreviewSheet extends StatelessWidget {
           children: [
             Row(
               children: [
-                CheckCircle(checked: task.done, onTap: onToggleDone),
+                CheckCircle(checked: task.done, onTap: widget.onToggleDone),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -94,15 +117,50 @@ class _TaskPreviewSheet extends StatelessWidget {
                 ),
               ),
             ],
-            if (onEdit != null) ...[
+            if (_pending != null) ...[
               const SizedBox(height: 20),
-              Align(
-                alignment: Alignment.bottomRight,
-                child: TextButton.icon(
-                  onPressed: onEdit,
-                  icon: const Icon(LucideIcons.pencil, size: 16),
-                  label: const Text('Edit'),
-                ),
+              InlineConfirmCard(
+                layout: InlineConfirmLayout.iconSplit,
+                confirmIcon: _pending == _TaskPendingAction.archive
+                    ? LucideIcons.archive
+                    : LucideIcons.trash2,
+                onConfirm: () {
+                  final navigator = Navigator.of(context);
+                  if (_pending == _TaskPendingAction.archive) {
+                    widget.onArchive?.call();
+                  } else {
+                    widget.onTrash?.call();
+                  }
+                  navigator.pop();
+                },
+                onCancel: () => setState(() => _pending = null),
+              ),
+            ] else if (hasActions) ...[
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (widget.onArchive != null)
+                    IconButton(
+                      icon: const Icon(LucideIcons.archive, size: 18),
+                      tooltip: 'Archive',
+                      onPressed: () =>
+                          setState(() => _pending = _TaskPendingAction.archive),
+                    ),
+                  if (widget.onTrash != null)
+                    IconButton(
+                      icon: const Icon(LucideIcons.trash2, size: 18),
+                      tooltip: 'Move to trash',
+                      onPressed: () =>
+                          setState(() => _pending = _TaskPendingAction.trash),
+                    ),
+                  if (widget.onEdit != null)
+                    TextButton.icon(
+                      onPressed: widget.onEdit,
+                      icon: const Icon(LucideIcons.pencil, size: 16),
+                      label: const Text('Edit'),
+                    ),
+                ],
               ),
             ],
           ],

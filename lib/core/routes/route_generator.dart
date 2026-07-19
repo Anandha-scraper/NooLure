@@ -13,6 +13,7 @@ import '../../screens/profile/edit_profile_screen.dart';
 import '../../screens/profile/profile_screen.dart';
 import '../../screens/tasks/add_task_screen.dart';
 import '../../screens/tasks/edit_task_screen.dart';
+import '../../screens/tasks/task_archive_screen.dart';
 import '../../screens/tasks/task_screen.dart';
 import '../../screens/tasks/trash_screen.dart';
 import '../../screens/trips/add_trip_screen.dart';
@@ -37,6 +38,8 @@ class RouteGenerator {
         return _page(const AddTaskScreen());
       case AppRoutes.trash:
         return _page(const TrashScreen());
+      case AppRoutes.taskArchive:
+        return _page(const TaskArchiveScreen());
       case AppRoutes.notes:
         return _page(const NotesScreen());
       case AppRoutes.addNote:

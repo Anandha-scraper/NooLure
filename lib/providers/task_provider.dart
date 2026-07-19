@@ -16,7 +16,7 @@ class TaskProvider extends ChangeNotifier {
 
   void _apply(List<TaskModel> tasks) {
     _allTasks = tasks;
-    _tasks = tasks.where((t) => !t.isDeleted).toList()
+    _tasks = tasks.where((t) => !t.isDeleted && !t.isArchived).toList()
       ..sort(_byDueThenCreated);
     notifyListeners();
   }
@@ -124,6 +124,29 @@ class TaskProvider extends ChangeNotifier {
     for (final t in trashedTasks) {
       await _repository.delete(t.id);
     }
+  }
+
+  List<TaskModel> get archivedTasks {
+    final archived = _allTasks
+        .where((t) => t.isArchived && !t.isDeleted)
+        .toList();
+    archived.sort((a, b) => b.archivedAt!.compareTo(a.archivedAt!));
+    return archived;
+  }
+
+  int get archiveCount =>
+      _allTasks.where((t) => t.isArchived && !t.isDeleted).length;
+
+  Future<void> archiveTask(String id) async {
+    final task = _findInAll(id);
+    if (task == null) return;
+    await _repository.save(task.copyWith(archivedAt: DateTime.now()));
+  }
+
+  Future<void> unarchiveTask(String id) async {
+    final task = _findInAll(id);
+    if (task == null) return;
+    await _repository.save(task.copyWith(clearArchivedAt: true));
   }
 
   TaskModel? _findInAll(String id) {
