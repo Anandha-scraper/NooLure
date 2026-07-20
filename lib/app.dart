@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/routes/route_generator.dart';
+import 'core/routes/route_observer.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/birthday_provider.dart';
@@ -35,6 +36,7 @@ class NooLureApp extends StatelessWidget {
             theme: AppTheme.light(accentSeed: themeProvider.accentSeed),
             darkTheme: AppTheme.dark(accentSeed: themeProvider.accentSeed),
             themeMode: themeProvider.mode,
+            navigatorObservers: [appRouteObserver],
             onGenerateRoute: RouteGenerator.generateRoute,
             home: const AuthGate(),
           );

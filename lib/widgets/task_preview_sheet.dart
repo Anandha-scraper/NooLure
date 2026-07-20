@@ -120,7 +120,6 @@ class _TaskPreviewSheetState extends State<_TaskPreviewSheet> {
             if (_pending != null) ...[
               const SizedBox(height: 20),
               InlineConfirmCard(
-                layout: InlineConfirmLayout.iconSplit,
                 confirmIcon: _pending == _TaskPendingAction.archive
                     ? LucideIcons.archive
                     : LucideIcons.trash2,
