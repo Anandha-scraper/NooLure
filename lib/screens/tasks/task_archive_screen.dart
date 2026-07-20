@@ -132,7 +132,10 @@ class _ArchiveRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: isArmed
           ? InlineConfirmCard(
-              confirmIcon: LucideIcons.archiveRestore,
+              actionIcon: LucideIcons.archiveRestore,
+              actionColor: AppColors.accent2,
+              actionLabel: 'Restore "${task.title}"',
+              height: 78,
               onConfirm: () {
                 _unarchive(context);
                 onDisarm();

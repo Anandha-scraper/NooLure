@@ -70,7 +70,6 @@ class _ArchiveRowState extends State<_ArchiveRow> {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
     final note = widget.note;
-    final provider = widget.provider;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),

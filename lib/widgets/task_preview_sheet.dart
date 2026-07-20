@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../core/constants/app_colors.dart';
 import '../core/theme/text_styles.dart';
 import '../models/task_model.dart';
 import 'check_circle.dart';
@@ -120,9 +121,16 @@ class _TaskPreviewSheetState extends State<_TaskPreviewSheet> {
             if (_pending != null) ...[
               const SizedBox(height: 20),
               InlineConfirmCard(
-                confirmIcon: _pending == _TaskPendingAction.archive
+                actionIcon: _pending == _TaskPendingAction.archive
                     ? LucideIcons.archive
                     : LucideIcons.trash2,
+                actionColor: _pending == _TaskPendingAction.archive
+                    ? AppColors.accent2
+                    : Theme.of(context).colorScheme.error,
+                actionLabel: _pending == _TaskPendingAction.archive
+                    ? 'Archive "${task.title}"'
+                    : 'Move "${task.title}" to trash',
+                height: 78,
                 onConfirm: () {
                   final navigator = Navigator.of(context);
                   if (_pending == _TaskPendingAction.archive) {

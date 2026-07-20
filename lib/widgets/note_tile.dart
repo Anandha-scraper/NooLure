@@ -145,13 +145,11 @@ class PinnedNoteCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               note.title,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               // Caprasimo, matching NoteTile's title — these two cards sit
               // side by side and used to render the same element in different
               // typefaces.
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
               style: TextStyles.heading(size: 17, color: ink),
             ),
             const SizedBox(height: 6),
