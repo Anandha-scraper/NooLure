@@ -24,52 +24,61 @@ class NoteTile extends StatelessWidget {
       onLongPress: onLongPress,
       child: CardContainer(
         elevation: CardElevation.sm,
+        // The meta line is deliberately pinned to the bottom via
+        // spaceBetween — a short one-line title with no body would otherwise
+        // leave dead space under it while a full title+body card fills edge
+        // to edge, making cards of different content lengths look
+        // inconsistent even though the outer box is already uniform-sized.
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            TagChip(note.tag),
-            if (note.isImage) ...[
-              const SizedBox(height: 8),
-              Container(
-                height: 56,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.softFill(
-                        theme.colorScheme.primary,
-                        theme.brightness,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TagChip(note.tag),
+                if (note.isImage) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.softFill(
+                            theme.colorScheme.primary,
+                            theme.brightness,
+                          ),
+                          AppColors.softFill(
+                            AppColors.accent2,
+                            theme.brightness,
+                          ),
+                        ],
                       ),
-                      AppColors.softFill(AppColors.accent2, theme.brightness),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            Flexible(
-              child: Text(
-                note.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyles.cardTitle(context),
-              ),
-            ),
-            if (note.body.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Flexible(
-                child: Text(
-                  note.body,
-                  maxLines: 3,
+                ],
+                const SizedBox(height: 8),
+                Text(
+                  note.title,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyles.cardBody(context),
+                  style: TextStyles.cardTitle(context),
                 ),
-              ),
-            ],
-            const SizedBox(height: 8),
+                if (note.body.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    note.body,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyles.cardBody(context),
+                  ),
+                ],
+              ],
+            ),
             CardMeta('Edited ${note.editedLabel}'),
           ],
         ),
@@ -136,11 +145,11 @@ class PinnedNoteCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               note.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               // Caprasimo, matching NoteTile's title — these two cards sit
               // side by side and used to render the same element in different
               // typefaces.
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
               style: TextStyles.heading(size: 17, color: ink),
             ),
             const SizedBox(height: 6),

@@ -51,6 +51,7 @@ class TaskModel {
     this.description = '',
     this.repeat = TaskRepeat.none,
     this.deletedAt,
+    this.archivedAt,
   });
 
   final String id;
@@ -71,7 +72,12 @@ class TaskModel {
   /// Non-null when the task has been moved to trash.
   final DateTime? deletedAt;
 
+  /// Non-null when the task has been archived — hidden from the main list
+  /// without being deleted, same nullable-timestamp shape as [deletedAt].
+  final DateTime? archivedAt;
+
   bool get isDeleted => deletedAt != null;
+  bool get isArchived => archivedAt != null;
 
   /// 'Today' / 'Tomorrow' / 'Fri, Mar 3', recomputed on every build.
   String get dateLabel =>
@@ -98,6 +104,8 @@ class TaskModel {
     DateTime? updatedAt,
     DateTime? deletedAt,
     bool clearDeletedAt = false,
+    DateTime? archivedAt,
+    bool clearArchivedAt = false,
   }) => TaskModel(
     id: id,
     title: title ?? this.title,
@@ -110,6 +118,7 @@ class TaskModel {
     createdAt: createdAt,
     updatedAt: updatedAt ?? DateTime.now(),
     deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
+    archivedAt: clearArchivedAt ? null : (archivedAt ?? this.archivedAt),
   );
 
   Map<String, dynamic> toJson() => {
@@ -124,6 +133,7 @@ class TaskModel {
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'deletedAt': deletedAt?.toIso8601String(),
+    'archivedAt': archivedAt?.toIso8601String(),
   };
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
@@ -137,6 +147,7 @@ class TaskModel {
       done: (json['done'] as bool?) ?? false,
       description: (json['description'] as String?) ?? '',
       repeat: TaskRepeatLabel.fromLabel(json['repeat'] as String?),
+      archivedAt: _parseDate(json['archivedAt']),
       createdAt: created,
       updatedAt: _parseDate(json['updatedAt']) ?? created,
       deletedAt: _parseDate(json['deletedAt']),
