@@ -22,6 +22,7 @@ const _drawerItems = [
   _DrawerItem(LucideIcons.notebook, 'Notes', AppRoutes.notes),
   _DrawerItem(LucideIcons.cake, 'Birthdays', AppRoutes.birthdays),
   _DrawerItem(LucideIcons.plane, 'Trip Planner', AppRoutes.trips),
+  _DrawerItem(LucideIcons.keyRound, 'Passwords', AppRoutes.passwords),
 ];
 
 /// The side-drawer nav — header (avatar/name/email), nav items with an

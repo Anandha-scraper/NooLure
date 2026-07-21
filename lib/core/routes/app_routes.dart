@@ -20,6 +20,9 @@ class AppRoutes {
   static const String trips = '/trips';
   static const String addTrip = '/trips/add';
   static const String tripDetail = '/trips/detail';
+  static const String passwords = '/passwords';
+  static const String addPassword = '/passwords/add';
+  static const String editPassword = '/passwords/edit';
   static const String profile = '/profile';
   static const String editProfile = '/profile/edit';
 }

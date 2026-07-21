@@ -280,7 +280,12 @@ class _NoteRowState extends State<_NoteRow> {
           });
           return false;
         },
-        child: widget.child,
+        // Dismissible wraps its child in a Stack (to layer the swipe
+        // background behind it) with the default loose fit, which lets the
+        // card hug its own content width instead of filling the row. Force
+        // it back to full width here, at the exact point Dismissible would
+        // otherwise loosen it.
+        child: SizedBox(width: double.infinity, child: widget.child),
       );
     }
     return widget.expand ? SizedBox.expand(child: content) : content;
