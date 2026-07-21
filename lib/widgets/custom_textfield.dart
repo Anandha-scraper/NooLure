@@ -11,6 +11,7 @@ class CustomTextField extends StatelessWidget {
     this.suffixIcon,
     this.maxLines = 1,
     this.readOnly = false,
+    this.obscureText = false,
     this.onTap,
     this.borderRadius,
   });
@@ -21,6 +22,7 @@ class CustomTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final int maxLines;
   final bool readOnly;
+  final bool obscureText;
   final VoidCallback? onTap;
 
   /// Overrides the themed pill (999) radius — e.g. for a multiline field
@@ -38,6 +40,7 @@ class CustomTextField extends StatelessWidget {
       controller: controller,
       maxLines: maxLines,
       readOnly: readOnly,
+      obscureText: obscureText,
       onTap: onTap,
       decoration: InputDecoration(
         hintText: hintText,

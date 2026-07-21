@@ -152,7 +152,13 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
               controller: _titleController,
               style: TextStyles.heading(size: 20, color: onSurface),
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration.collapsed(hintText: 'Title'),
+              decoration: InputDecoration.collapsed(hintText: 'Title').copyWith(
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+              ),
             ),
             const SizedBox(height: 10),
             TagInputField(
@@ -177,8 +183,14 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                 height: 1.5,
                 color: onSurface.withValues(alpha: 0.85),
               ),
-              decoration: const InputDecoration.collapsed(
+              decoration: InputDecoration.collapsed(
                 hintText: 'Write something…',
+              ).copyWith(
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
               ),
             ),
           ],

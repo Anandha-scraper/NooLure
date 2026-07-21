@@ -13,8 +13,16 @@ class LocalStore {
   static const String tasks = 'tasks';
   static const String notes = 'notes';
   static const String birthdays = 'birthdays';
+  static const String passwords = 'passwords';
+  static const String passwordVault = 'passwordVault';
 
-  static const List<String> collections = [tasks, notes, birthdays];
+  static const List<String> collections = [
+    tasks,
+    notes,
+    birthdays,
+    passwords,
+    passwordVault,
+  ];
 
   static Future<void> init() async {
     await Hive.initFlutter();

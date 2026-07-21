@@ -34,7 +34,14 @@ class TagInputField extends StatelessWidget {
         borderless
             ? TextField(
                 controller: controller,
-                decoration: InputDecoration.collapsed(hintText: hintText),
+                decoration: InputDecoration.collapsed(hintText: hintText)
+                    .copyWith(
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
+                    ),
               )
             : CustomTextField(controller: controller, hintText: hintText),
         ListenableBuilder(

@@ -8,7 +8,10 @@ import '../../screens/home/home_screen.dart';
 import '../../screens/notes/add_note_screen.dart';
 import '../../screens/notes/notes_archive_screen.dart';
 import '../../screens/notes/notes_screen.dart';
+import '../../models/password_model.dart';
 import '../../screens/notes/notes_trash_screen.dart';
+import '../../screens/passwords/add_password_screen.dart';
+import '../../screens/passwords/passwords_screen.dart';
 import '../../screens/profile/edit_profile_screen.dart';
 import '../../screens/profile/profile_screen.dart';
 import '../../screens/tasks/add_task_screen.dart';
@@ -72,6 +75,20 @@ class RouteGenerator {
         return _page(const ProfileScreen());
       case AppRoutes.editProfile:
         return _page(const EditProfileScreen());
+      case AppRoutes.passwords:
+        return _page(const PasswordsScreen());
+      case AppRoutes.addPassword:
+        return _page(const AddPasswordScreen());
+      case AppRoutes.editPassword:
+        final args =
+            settings.arguments as ({String id, PasswordEntryData data, String tag});
+        return _page(
+          AddPasswordScreen(
+            entryId: args.id,
+            existing: args.data,
+            existingTag: args.tag,
+          ),
+        );
       default:
         return _page(
           Scaffold(body: Center(child: Text('No route: ${settings.name}'))),

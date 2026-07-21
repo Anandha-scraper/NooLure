@@ -120,6 +120,7 @@ class AppTheme {
         backgroundColor: bg,
         foregroundColor: onSurface,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: true,
         iconTheme: IconThemeData(color: onSurface),
         titleTextStyle: TextStyles.h4(color: onSurface),
