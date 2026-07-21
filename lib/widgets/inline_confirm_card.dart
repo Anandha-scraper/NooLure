@@ -25,8 +25,8 @@ Widget swipeBackground({
 }
 
 /// Replaces a swiped card once an action is armed: the card itself splits
-/// top/bottom instead of popping a dialog or showing a button row. Top half
-/// always cancels (X), bottom half is the specific action alone — icon-only,
+/// left/right instead of popping a dialog or showing a button row. Left half
+/// always cancels (X), right half is the specific action alone — icon-only,
 /// so there's nothing that can overflow regardless of how narrow the card is
 /// (unlike the old Cancel/Confirm button row, which broke in the notes grid).
 class InlineConfirmCard extends StatelessWidget {
@@ -40,17 +40,17 @@ class InlineConfirmCard extends StatelessWidget {
     this.height,
   });
 
-  /// Icon for the bottom half, e.g. LucideIcons.check / .trash2 / .archive /
+  /// Icon for the right half, e.g. LucideIcons.check / .trash2 / .archive /
   /// .archiveRestore.
   final IconData actionIcon;
 
-  /// Base semantic color the bottom half's fill/ink are derived from via
+  /// Base semantic color the right half's fill/ink are derived from via
   /// [AppColors.softFill]/[AppColors.softInk] — [AppColors.accent2] for
   /// positive actions (done/archive/restore), the theme's error color for
   /// destructive ones.
   final Color actionColor;
 
-  /// Screen-reader-only description of the bottom action (e.g. 'Archive
+  /// Screen-reader-only description of the right-half action (e.g. 'Archive
   /// "Grocery list"'). Not rendered as visible text — icon-only by design.
   final String actionLabel;
 
@@ -59,8 +59,8 @@ class InlineConfirmCard extends StatelessWidget {
 
   /// Bounds the card's height when the parent doesn't already provide a tight
   /// constraint. Leave null only when the parent already constrains height
-  /// tightly (e.g. a grid cell wrapped in SizedBox.expand) — the Column of
-  /// two Expanded halves needs a bounded height from somewhere.
+  /// tightly (e.g. a grid cell wrapped in SizedBox.expand) — the Row of two
+  /// Expanded halves needs a bounded height from somewhere.
   final double? height;
 
   @override
@@ -76,7 +76,7 @@ class InlineConfirmCard extends StatelessWidget {
 
     final split = ClipRRect(
       borderRadius: BorderRadius.circular(32),
-      child: Column(
+      child: Row(
         children: [
           Expanded(
             child: _ConfirmHalf(
@@ -87,7 +87,7 @@ class InlineConfirmCard extends StatelessWidget {
               onTap: onCancel,
             ),
           ),
-          Container(height: 1, color: divider),
+          Container(width: 1, color: divider),
           Expanded(
             child: _ConfirmHalf(
               icon: actionIcon,
