@@ -25,6 +25,7 @@ class AppScaffold extends StatelessWidget {
     this.floatingActionButton,
     this.titleStyle,
     this.centerTitle = false,
+    this.bottomBar,
   });
 
   /// A section screen (Tasks, Notes, …) passes its own route here to get the
@@ -38,6 +39,10 @@ class AppScaffold extends StatelessWidget {
   final Widget? floatingActionButton;
   final TextStyle? titleStyle;
   final bool centerTitle;
+
+  /// Optional footer, e.g. the notes editor's undo/redo bar. Forwarded
+  /// straight to [Scaffold.bottomNavigationBar]; left null everywhere else.
+  final Widget? bottomBar;
 
   bool get _isHome => drawerRoute == AppRoutes.home;
 
@@ -60,6 +65,7 @@ class AppScaffold extends StatelessWidget {
         actions: actions,
       ),
       floatingActionButton: floatingActionButton,
+      bottomNavigationBar: bottomBar,
       body: SafeArea(top: false, child: body),
     );
   }
