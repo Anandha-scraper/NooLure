@@ -112,29 +112,6 @@ jobs:
           printf '%s' "$SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
 
-      - name: Verify the service account file is valid, complete JSON
-        # Diagnostic only — catches a mis-pasted FIREBASE_SERVICE_ACCOUNT
-        # secret (truncated, wrapped in extra quotes, accidentally base64'd,
-        # etc.) with a clear error instead of the opaque "Failed to
-        # authenticate" firebase-tools throws further down the job. Never
-        # prints private_key.
-        run: |
-          python3 -c "
-          import json, sys
-          path = '$RUNNER_TEMP/firebase-service-account.json'
-          try:
-              data = json.load(open(path))
-          except Exception as e:
-              print(f'::error::Service account file is not valid JSON ({e}). Re-check the FIREBASE_SERVICE_ACCOUNT secret was pasted as the raw, complete file contents.')
-              sys.exit(1)
-          required = ['type', 'project_id', 'private_key', 'client_email']
-          missing = [k for k in required if not data.get(k)]
-          if missing:
-              print(f'::error::Service account JSON is missing fields: {missing}')
-              sys.exit(1)
-          print(f'Service account OK — type={data[\"type\"]!r}, project_id={data[\"project_id\"]!r}, client_email={data[\"client_email\"][:10]}...redacted')
-          "
-
       - name: Delete previous Firebase App Distribution releases
         # Wipes every existing release for this app so only the build we're
         # about to upload remains. Non-fatal on purpose: if firebase-tools
