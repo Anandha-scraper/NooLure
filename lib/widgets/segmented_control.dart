@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// Pill-shaped multi-option switch — `.seg` / `.seg-opt` in the design
-/// system. Used by Tasks (priority/repeat), Profile (Light/Dark), and
-/// Home (birthday Month/Week scope).
+/// system. Used by Tasks (priority/routine frequency), Profile (Light/Dark),
+/// and Home (birthday Month/Week scope).
 class AppSegmentedControl<T> extends StatelessWidget {
   const AppSegmentedControl({
     super.key,
@@ -25,8 +25,8 @@ class AppSegmentedControl<T> extends StatelessWidget {
     // so putting the border there would stretch it even when every option
     // already fits. Wrapping it this way instead keeps the pill hugging its
     // content when it fits, and only makes the far side reachable by swipe
-    // when it doesn't (e.g. Priority/Repeat, which can run past narrow
-    // screens with no other way to reach the last option).
+    // when it doesn't (e.g. Priority/Routine frequency, which can run past
+    // narrow screens with no other way to reach the last option).
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Container(
