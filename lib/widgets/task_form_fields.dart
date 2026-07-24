@@ -2,20 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../core/utils/date_labels.dart';
+import '../models/routine_config.dart';
 import '../models/task_model.dart';
 import 'segmented_control.dart';
 
-/// Shared due-date/time, priority, and repeat inputs, used by both the add
-/// and edit task screens so the two forms stay in sync.
+/// Shared due-date/time, priority, and routine-frequency inputs, used by
+/// both the add and edit task screens so the two forms stay in sync.
 class DueField extends StatelessWidget {
   const DueField({
     super.key,
     required this.dueAt,
+    required this.hasDueTime,
     required this.onPick,
     required this.onClear,
   });
 
   final DateTime? dueAt;
+  final bool hasDueTime;
   final VoidCallback onPick;
   final VoidCallback onClear;
 
@@ -47,7 +50,9 @@ class DueField extends StatelessWidget {
               child: Text(
                 due == null
                     ? 'Someday — tap to pick a date'
-                    : DateLabels.dayTimeLabel(due),
+                    : (hasDueTime
+                          ? DateLabels.dayTimeLabel(due)
+                          : DateLabels.dayLabel(due)),
                 style: TextStyle(
                   fontSize: 14,
                   color: onSurface.withValues(alpha: due == null ? 0.5 : 1),
@@ -68,6 +73,16 @@ class DueField extends StatelessWidget {
       ),
     );
   }
+}
+
+/// True when [dueAt] has already passed — day-precise when [hasDueTime] is
+/// false (a date-only pick is only "in the past" once its whole day has),
+/// exact-instant precise otherwise.
+bool isDueDateInPast(DateTime dueAt, bool hasDueTime, {DateTime? now}) {
+  final n = now ?? DateTime.now();
+  return hasDueTime
+      ? dueAt.isBefore(n)
+      : DateLabels.dateOnly(dueAt).isBefore(DateLabels.dateOnly(n));
 }
 
 class PriorityField extends StatelessWidget {
@@ -91,33 +106,42 @@ class PriorityField extends StatelessWidget {
   }
 }
 
-class RepeatField extends StatelessWidget {
-  const RepeatField({super.key, required this.value, required this.onChanged});
+class RoutineFrequencyField extends StatelessWidget {
+  const RoutineFrequencyField({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
 
-  final TaskRepeat value;
-  final ValueChanged<TaskRepeat> onChanged;
+  final RoutineFrequency value;
+  final ValueChanged<RoutineFrequency> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return AppSegmentedControl<TaskRepeat>(
+    return AppSegmentedControl<RoutineFrequency>(
       value: value,
       onChanged: onChanged,
       options: const [
-        (TaskRepeat.none, 'Never'),
-        (TaskRepeat.daily, 'Daily'),
-        (TaskRepeat.weekly, 'Weekly'),
-        (TaskRepeat.monthly, 'Monthly'),
+        (RoutineFrequency.daily, 'Daily'),
+        (RoutineFrequency.custom, 'Custom'),
       ],
     );
   }
 }
 
-/// Shows the date picker then the time picker, returning the combined
-/// [DateTime], or null if the user cancelled the date step.
-Future<DateTime?> pickTaskDueDate(
+/// The result of [pickTaskDueDate]: the picked date (always midnight when
+/// [hasTime] is false), and whether the user chose to attach a specific time.
+typedef DueDatePick = ({DateTime dueAt, bool hasTime});
+
+/// Shows the date picker, then asks whether to attach a specific time —
+/// dismissing that ask (or the time picker itself) means "no specific time"
+/// rather than silently defaulting to 9:00 AM. Returns null if the user
+/// cancelled the date step.
+Future<DueDatePick?> pickTaskDueDate(
   BuildContext context,
-  DateTime? current,
-) async {
+  DateTime? current, {
+  bool currentHasTime = true,
+}) async {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final initial = current ?? now;
@@ -135,11 +159,45 @@ Future<DateTime?> pickTaskDueDate(
   );
   if (date == null || !context.mounted) return null;
 
+  final wantsTime = await _askIncludeTime(context);
+  if (!context.mounted || wantsTime == null) return null;
+
+  if (!wantsTime) {
+    return (dueAt: DateTime(date.year, date.month, date.day), hasTime: false);
+  }
+
   final time = await showTimePicker(
     context: context,
-    initialTime: TimeOfDay.fromDateTime(current ?? now),
+    initialTime: currentHasTime
+        ? TimeOfDay.fromDateTime(current ?? now)
+        : const TimeOfDay(hour: 9, minute: 0),
   );
   if (!context.mounted) return null;
-
-  return DateTime(date.year, date.month, date.day, time?.hour ?? 9, time?.minute ?? 0);
+  if (time == null) {
+    return (dueAt: DateTime(date.year, date.month, date.day), hasTime: false);
+  }
+  return (
+    dueAt: DateTime(date.year, date.month, date.day, time.hour, time.minute),
+    hasTime: true,
+  );
 }
+
+Future<bool?> _askIncludeTime(BuildContext context) => showDialog<bool>(
+  context: context,
+  builder: (dialogContext) => AlertDialog(
+    title: const Text('Add a time?'),
+    content: const Text(
+      'Pick a specific time for this due date, or leave it for the whole day.',
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.of(dialogContext).pop(false),
+        child: const Text('No specific time'),
+      ),
+      TextButton(
+        onPressed: () => Navigator.of(dialogContext).pop(true),
+        child: const Text('Set a time'),
+      ),
+    ],
+  ),
+);

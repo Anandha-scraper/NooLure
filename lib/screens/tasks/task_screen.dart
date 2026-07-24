@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/text_styles.dart';
+import '../../core/utils/date_labels.dart';
+import '../../core/utils/routine_occurrence.dart';
+import '../../models/routine_config.dart';
 import '../../models/task_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/task_provider.dart';
@@ -26,6 +29,7 @@ class _TaskScreenState extends State<TaskScreen> {
   bool _celebrationDismissed = false;
   bool _wasAllDone = false;
   bool _completedExpanded = true;
+  bool _missedExpanded = true;
 
   @override
   Widget build(BuildContext context) {
@@ -33,8 +37,22 @@ class _TaskScreenState extends State<TaskScreen> {
     final provider = context.watch<TaskProvider>();
     final onSurface = theme.colorScheme.onSurface;
     final all = provider.filteredTasks;
-    final openTasks = all.where((t) => !t.done).toList();
-    final completedTasks = all.where((t) => t.done).toList();
+    final routineTasks = all
+        .where((t) => t.routine != null && !t.isRoutineFinished)
+        .toList();
+    final openTasks = all
+        .where((t) => t.routine == null && !t.done && !t.isMissed)
+        .toList();
+    final missedTasks = all
+        .where((t) => t.routine == null && !t.done && t.isMissed)
+        .toList();
+    final completedTasks = all
+        .where(
+          (t) =>
+              (t.routine == null && t.done) ||
+              (t.routine != null && t.isRoutineFinished),
+        )
+        .toList();
 
     // Re-arm the celebration each time it's freshly earned, rather than only
     // ever showing it once per app session.
@@ -145,6 +163,64 @@ class _TaskScreenState extends State<TaskScreen> {
                   ],
                 ),
               ],
+              if (routineTasks.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                Text(
+                  'Routines',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                for (final task in routineTasks)
+                  _RoutineTaskRow(task: task, provider: provider),
+              ],
+              if (missedTasks.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                InkWell(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: () =>
+                      setState(() => _missedExpanded = !_missedExpanded),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Missed (${missedTasks.length})',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      AnimatedRotation(
+                        turns: _missedExpanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 150),
+                        child: Icon(
+                          LucideIcons.chevronDown,
+                          size: 16,
+                          color: onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_missedExpanded) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'long-press to edit · swipe to delete',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: onSurface.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  for (final task in missedTasks)
+                    _TaskRow(task: task, provider: provider, allowComplete: true),
+                ],
+              ],
               if (completedTasks.isNotEmpty) ...[
                 const SizedBox(height: 18),
                 InkWell(
@@ -187,11 +263,14 @@ class _TaskScreenState extends State<TaskScreen> {
                   ),
                   const SizedBox(height: 10),
                   for (final task in completedTasks)
-                    _TaskRow(
-                      task: task,
-                      provider: provider,
-                      allowComplete: false,
-                    ),
+                    if (task.routine != null)
+                      _FinishedRoutineRow(task: task)
+                    else
+                      _TaskRow(
+                        task: task,
+                        provider: provider,
+                        allowComplete: false,
+                      ),
                 ],
               ],
             ],
@@ -252,13 +331,23 @@ class _TaskRowState extends State<_TaskRow> {
                   ? 'Mark "${task.title}" as done'
                   : 'Move "${task.title}" to trash',
               height: 76,
-              onConfirm: () {
+              onConfirm: () async {
                 if (_pending == _PendingAction.done) {
-                  widget.provider.toggleDone(task.id);
+                  await widget.provider.toggleDone(task.id);
+                  final updated = widget.provider.byId(task.id);
+                  if (updated != null && updated.isCompletedLate && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Completed late ${DateLabels.relativeLabel(updated.completedAt!)}',
+                        ),
+                      ),
+                    );
+                  }
                 } else {
                   widget.provider.trashTask(task.id);
                 }
-                setState(() => _pending = null);
+                if (mounted) setState(() => _pending = null);
               },
               onCancel: () => setState(() => _pending = null),
             )
@@ -310,6 +399,178 @@ class _TaskRowState extends State<_TaskRow> {
                 ).pushNamed(AppRoutes.taskDetail, arguments: task.id),
               ),
             ),
+    );
+  }
+}
+
+/// A routine's ongoing row — no swipe-to-complete (ambiguous for a
+/// multi-day, still-in-progress thing); tapping opens the preview sheet,
+/// which surfaces today's status and a "Mark today done" action.
+class _RoutineTaskRow extends StatefulWidget {
+  const _RoutineTaskRow({required this.task, required this.provider});
+
+  final TaskModel task;
+  final TaskProvider provider;
+
+  @override
+  State<_RoutineTaskRow> createState() => _RoutineTaskRowState();
+}
+
+class _RoutineTaskRowState extends State<_RoutineTaskRow> {
+  bool _confirmingDelete = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final task = widget.task;
+    final routine = task.routine!;
+    final now = DateTime.now();
+    final status = todaysOccurrence(routine, now: now);
+    final dayNumber = dayNumberFor(routine, now);
+    final total = totalOccurrenceCount(routine);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: _confirmingDelete
+          ? InlineConfirmCard(
+              actionIcon: LucideIcons.trash2,
+              actionColor: theme.colorScheme.error,
+              actionLabel: 'Move "${task.title}" to trash',
+              height: 76,
+              onConfirm: () {
+                widget.provider.trashTask(task.id);
+                setState(() => _confirmingDelete = false);
+              },
+              onCancel: () => setState(() => _confirmingDelete = false),
+            )
+          : Dismissible(
+              key: ValueKey(task.id),
+              direction: DismissDirection.endToStart,
+              secondaryBackground: swipeBackground(
+                alignment: Alignment.centerRight,
+                color: theme.colorScheme.error.withValues(alpha: 0.15),
+                icon: LucideIcons.trash2,
+                iconColor: theme.colorScheme.error,
+              ),
+              confirmDismiss: (direction) async {
+                setState(() => _confirmingDelete = true);
+                return false;
+              },
+              child: TaskTile(
+                task: task,
+                showDragHandle: true,
+                onToggle: null,
+                checkedOverride: false,
+                metaOverride: dayNumber == null
+                    ? 'Not scheduled today'
+                    : 'Day $dayNumber of $total · ${_routineStatusPhrase(status, routine)}',
+                metaIsAlert: status == RoutineOccurrenceStatus.missed,
+                onTap: () => showTaskPreview(
+                  context,
+                  task,
+                  onEdit: () => Navigator.of(
+                    context,
+                  ).pushNamed(AppRoutes.taskDetail, arguments: task.id),
+                  onToggleDone: null,
+                  onCompleteRoutineOccurrence: () async {
+                    final completedAt = DateTime.now();
+                    final result = await widget.provider
+                        .completeRoutineOccurrence(task.id, completedAt);
+                    final dn = dayNumberFor(routine, completedAt);
+                    if (!context.mounted || dn == null) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          result == RoutineOccurrenceStatus.completedLate
+                              ? 'Day $dn completed late ${DateLabels.relativeLabel(completedAt)}'
+                              : 'Day $dn completed ${DateLabels.relativeLabel(completedAt)}',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                onLongPress: () => Navigator.of(
+                  context,
+                ).pushNamed(AppRoutes.taskDetail, arguments: task.id),
+              ),
+            ),
+    );
+  }
+
+  String _routineStatusPhrase(RoutineOccurrenceStatus status, RoutineConfig routine) {
+    return switch (status) {
+      RoutineOccurrenceStatus.notScheduled => 'not scheduled today',
+      RoutineOccurrenceStatus.upcoming => 'due later today',
+      RoutineOccurrenceStatus.dueNow => () {
+        final window = preferredWindowLabel(routine);
+        return window == null ? 'due today' : 'due by $window';
+      }(),
+      RoutineOccurrenceStatus.completedOnTime => 'completed today',
+      RoutineOccurrenceStatus.completedLate => 'completed late today',
+      RoutineOccurrenceStatus.missed => 'missed today',
+    };
+  }
+}
+
+/// A routine whose end date has fully passed — read-only summary in the
+/// Completed section; edit (and from there, delete) is still reachable via
+/// long-press, same as every other task row.
+class _FinishedRoutineRow extends StatelessWidget {
+  const _FinishedRoutineRow({required this.task});
+
+  final TaskModel task;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final routine = task.routine!;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: AppColors.shadowSm(theme.brightness),
+        ),
+        child: Material(
+          color: theme.cardTheme.color,
+          borderRadius: BorderRadius.circular(32),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(32),
+            onLongPress: () => Navigator.of(
+              context,
+            ).pushNamed(AppRoutes.taskDetail, arguments: task.id),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          task.title,
+                          style: TextStyle(fontSize: 14.5, color: onSurface),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${completedOccurrenceCount(routine)}/${totalOccurrenceCount(routine)} days completed',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: onSurface.withValues(alpha: 0.55),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

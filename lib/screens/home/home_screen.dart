@@ -6,8 +6,8 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/text_styles.dart';
+import '../../core/utils/routine_occurrence.dart';
 import '../../models/birthday_model.dart';
-import '../../models/task_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/birthday_provider.dart';
 import '../../providers/task_provider.dart';
@@ -152,8 +152,8 @@ class HomeScreen extends StatelessWidget {
             if (tasks.homeTasks.isEmpty)
               const _EmptyHint('Nothing on your plate — tap + to add a task')
             else
-              for (final task in tasks.homeTasks)
-                _HomeTaskRow(task: task, provider: tasks),
+              for (final display in tasks.homeTasks)
+                _HomeTaskRow(display: display, provider: tasks),
             if (tasks.homeTasks.isNotEmpty) ...[
               const SizedBox(height: 8),
               Row(
@@ -188,11 +188,12 @@ class HomeScreen extends StatelessWidget {
 /// Today's swipeable task row — swipe-right marks done, but instead of a
 /// popup confirmation the card itself flips into an inline confirm/cancel
 /// row (see [InlineConfirmCard]); swipe-left still opens the preview sheet
-/// directly, since that's not a destructive action.
+/// directly, since that's not a destructive action. Branches on whether
+/// [display] is an ordinary open task or a routine's live "today" occurrence.
 class _HomeTaskRow extends StatefulWidget {
-  const _HomeTaskRow({required this.task, required this.provider});
+  const _HomeTaskRow({required this.display, required this.provider});
 
-  final TaskModel task;
+  final HomeTaskDisplay display;
   final TaskProvider provider;
 
   @override
@@ -204,8 +205,59 @@ class _HomeTaskRowState extends State<_HomeTaskRow> {
 
   @override
   Widget build(BuildContext context) {
+    return switch (widget.display) {
+      HomePlainTask(:final task) => _buildRow(
+        context,
+        key: ValueKey(task.id),
+        confirmLabel: 'Mark "${task.title}" as done',
+        tile: TaskTile(task: task, dense: true),
+        onConfirm: () => widget.provider.toggleDone(task.id),
+        onPreview: () => showTaskPreview(
+          context,
+          task,
+          onEdit: null,
+          onToggleDone: () => widget.provider.toggleDone(task.id),
+        ),
+      ),
+      HomeRoutineOccurrence(:final task, :final dayNumber, :final status) =>
+        _buildRow(
+          context,
+          key: ValueKey('${task.id}-$dayNumber'),
+          confirmLabel: 'Mark Day $dayNumber done',
+          tile: TaskTile(
+            task: task,
+            dense: true,
+            titleOverride: 'Day $dayNumber · ${task.title}',
+            metaOverride: preferredWindowLabel(task.routine!) ?? 'Due today',
+            metaIsAlert: status == RoutineOccurrenceStatus.dueNow,
+            checkedOverride: false,
+          ),
+          onConfirm: () => widget.provider.completeRoutineOccurrence(
+            task.id,
+            DateTime.now(),
+          ),
+          // No completion snackbar here — that only ever fires from the
+          // Tasks page (see task_screen.dart), per the request's explicit
+          // "in tasks pages view port only".
+          onPreview: () => showTaskPreview(
+            context,
+            task,
+            onEdit: null,
+            onToggleDone: null,
+          ),
+        ),
+    };
+  }
+
+  Widget _buildRow(
+    BuildContext context, {
+    required Key key,
+    required String confirmLabel,
+    required Widget tile,
+    required VoidCallback onConfirm,
+    required Future<void> Function() onPreview,
+  }) {
     final theme = Theme.of(context);
-    final task = widget.task;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -213,16 +265,16 @@ class _HomeTaskRowState extends State<_HomeTaskRow> {
           ? InlineConfirmCard(
               actionIcon: LucideIcons.check,
               actionColor: AppColors.accent2,
-              actionLabel: 'Mark "${task.title}" as done',
+              actionLabel: confirmLabel,
               height: 56,
               onConfirm: () {
-                widget.provider.toggleDone(task.id);
+                onConfirm();
                 setState(() => _confirming = false);
               },
               onCancel: () => setState(() => _confirming = false),
             )
           : Dismissible(
-              key: ValueKey(task.id),
+              key: key,
               background: swipeBackground(
                 alignment: Alignment.centerLeft,
                 color: AppColors.softFill(
@@ -251,16 +303,11 @@ class _HomeTaskRowState extends State<_HomeTaskRow> {
                 if (direction == DismissDirection.startToEnd) {
                   setState(() => _confirming = true);
                 } else {
-                  await showTaskPreview(
-                    context,
-                    task,
-                    onEdit: null,
-                    onToggleDone: () => widget.provider.toggleDone(task.id),
-                  );
+                  await onPreview();
                 }
                 return false;
               },
-              child: TaskTile(task: task, dense: true),
+              child: tile,
             ),
     );
   }
