@@ -1,7 +1,7 @@
 import '../core/utils/date_labels.dart';
 
 /// A saved password entry. [encryptedBlob] is the only place the actual
-/// title/username/password/url/notes live — see [PasswordEntryData] for the
+/// title/username/password/url/secret live — see [PasswordEntryData] for the
 /// decrypted shape used in memory while the vault is unlocked.
 ///
 /// [toJson] must only ever emit [id]/[encryptedBlob]/[tag]/timestamps — never
@@ -75,16 +75,22 @@ class PasswordEntryData {
     required this.username,
     required this.password,
     this.url = '',
+    this.secret = '',
   });
 
   final String username;
   final String password;
   final String url;
 
+  /// Optional secondary secret — a passcode, PIN, or longer recovery/backup
+  /// phrase associated with this same entry. Single- or multi-line.
+  final String secret;
+
   Map<String, dynamic> toJson() => {
     'username': username,
     'password': password,
     'url': url,
+    'secret': secret,
   };
 
   factory PasswordEntryData.fromJson(Map<String, dynamic> json) =>
@@ -92,5 +98,6 @@ class PasswordEntryData {
         username: (json['username'] as String?) ?? '',
         password: (json['password'] as String?) ?? '',
         url: (json['url'] as String?) ?? '',
+        secret: (json['secret'] as String?) ?? '',
       );
 }

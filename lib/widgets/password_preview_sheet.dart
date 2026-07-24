@@ -54,10 +54,12 @@ class _PasswordPreviewSheet extends StatefulWidget {
 class _PasswordPreviewSheetState extends State<_PasswordPreviewSheet> {
   bool _revealed = false;
   Timer? _clipboardClearTimer;
+  Timer? _secretClipboardClearTimer;
 
   @override
   void dispose() {
     _clipboardClearTimer?.cancel();
+    _secretClipboardClearTimer?.cancel();
     super.dispose();
   }
 
@@ -92,6 +94,23 @@ class _PasswordPreviewSheetState extends State<_PasswordPreviewSheet> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('URL copied')));
+  }
+
+  Future<void> _copySecret() async {
+    final secret = widget.data.secret;
+    await Clipboard.setData(ClipboardData(text: secret));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Copied — clears in 20s')),
+      );
+    }
+    _secretClipboardClearTimer?.cancel();
+    _secretClipboardClearTimer = Timer(const Duration(seconds: 20), () async {
+      final current = await Clipboard.getData(Clipboard.kTextPlain);
+      if (current?.text == secret) {
+        await Clipboard.setData(const ClipboardData(text: ''));
+      }
+    });
   }
 
   @override
@@ -153,6 +172,19 @@ class _PasswordPreviewSheetState extends State<_PasswordPreviewSheet> {
                 ],
               ),
             ),
+            if (data.secret.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _Field(
+                label: 'Passcode / Secret Phrase',
+                value: data.secret,
+                onSurface: onSurface,
+                trailing: IconButton(
+                  icon: const Icon(LucideIcons.copy, size: 18),
+                  tooltip: 'Copy',
+                  onPressed: _copySecret,
+                ),
+              ),
+            ],
             if (data.url.isNotEmpty) ...[
               const SizedBox(height: 12),
               _Field(
