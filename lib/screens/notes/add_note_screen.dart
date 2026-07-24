@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/theme/text_styles.dart';
 import '../../core/utils/known_categories.dart';
+import '../../core/utils/note_body_formatting.dart';
 import '../../models/note_model.dart';
 import '../../providers/note_provider.dart';
 import '../../widgets/app_scaffold.dart';
@@ -170,6 +171,46 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     setState(() {});
   }
 
+  /// Runs a body-formatting transform (Bullet/Checklist insert, Bold
+  /// wrap/unwrap) and applies its result. Deliberately NOT guarded by
+  /// _isApplyingHistory — this is new content the user chose to add, exactly
+  /// like typing, so it should flow through the normal autosave and
+  /// undo/redo-capture listeners like any other real edit.
+  void _applyFormatting(
+    ({String body, int caretOffset}) Function(String, int) transform,
+  ) {
+    final selection = _bodyController.selection;
+    final caretOffset = selection.isValid
+        ? selection.start
+        : _bodyController.text.length;
+    final result = transform(_bodyController.text, caretOffset);
+    _bodyController.value = TextEditingValue(
+      text: result.body,
+      selection: TextSelection.collapsed(offset: result.caretOffset),
+    );
+  }
+
+  void _handleBullet() => _applyFormatting(applyBulletToBody);
+
+  void _handleChecklist() => _applyFormatting(applyChecklistToBody);
+
+  void _handleBold() => _applyFormatting(applyBoldToBody);
+
+  /// Flutter updates the controller's selection to the tapped caret position
+  /// before invoking onTap, so this can inspect exactly where the tap landed
+  /// to detect "the user tapped a checklist glyph" vs. ordinary caret
+  /// placement for editing an item's label.
+  void _handleBodyTap() {
+    final caretOffset = _bodyController.selection.start;
+    if (caretOffset < 0) return;
+    final result = toggleChecklistAtOffset(_bodyController.text, caretOffset);
+    if (result == null) return;
+    _bodyController.value = TextEditingValue(
+      text: result.body,
+      selection: TextSelection.collapsed(offset: result.caretOffset),
+    );
+  }
+
   /// Builds the note to persist, or `null` while there's nothing worth
   /// saving yet (both title and body still empty).
   NoteModel? _buildNote() {
@@ -266,9 +307,16 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
               height: 1,
               color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            _FormattingToolbar(
+              onBullet: _handleBullet,
+              onChecklist: _handleChecklist,
+              onBold: _handleBold,
+            ),
+            const SizedBox(height: 8),
             TextField(
               controller: _bodyController,
+              onTap: _handleBodyTap,
               maxLines: null,
               minLines: 6,
               textAlignVertical: TextAlignVertical.top,
@@ -290,6 +338,44 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _FormattingToolbar extends StatelessWidget {
+  const _FormattingToolbar({
+    required this.onBullet,
+    required this.onChecklist,
+    required this.onBold,
+  });
+
+  final VoidCallback onBullet;
+  final VoidCallback onChecklist;
+  final VoidCallback onBold;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          icon: const Icon(LucideIcons.list),
+          tooltip: 'Bullet list',
+          visualDensity: VisualDensity.compact,
+          onPressed: onBullet,
+        ),
+        IconButton(
+          icon: const Icon(LucideIcons.listChecks),
+          tooltip: 'Checklist',
+          visualDensity: VisualDensity.compact,
+          onPressed: onChecklist,
+        ),
+        IconButton(
+          icon: const Icon(LucideIcons.bold),
+          tooltip: 'Bold',
+          visualDensity: VisualDensity.compact,
+          onPressed: onBold,
+        ),
+      ],
     );
   }
 }
