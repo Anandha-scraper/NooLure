@@ -29,6 +29,7 @@ class _PasswordsScreenState extends State<PasswordsScreen> {
   String _firstPin = '';
   int _errorTick = 0;
 
+
   @override
   void dispose() {
     // Leaving the section — always re-lock, whether via back or the drawer.
