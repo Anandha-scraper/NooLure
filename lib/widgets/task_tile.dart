@@ -17,6 +17,10 @@ class TaskTile extends StatelessWidget {
     this.onLongPress,
     this.dense = false,
     this.showDragHandle = false,
+    this.titleOverride,
+    this.metaOverride,
+    this.metaIsAlert = false,
+    this.checkedOverride,
   });
 
   final TaskModel task;
@@ -26,10 +30,27 @@ class TaskTile extends StatelessWidget {
   final bool dense;
   final bool showDragHandle;
 
+  /// Overrides the title text — used for a routine's "Day N · <title>" row.
+  final String? titleOverride;
+
+  /// Overrides the date/time meta line — used for a routine's preferred
+  /// window ("Due by 8:00 PM") instead of the plain due-date/time label.
+  final String? metaOverride;
+
+  /// Only consulted when [metaOverride] is set — whether that override text
+  /// should render in the error color (e.g. a routine occurrence that's
+  /// overdue for today).
+  final bool metaIsAlert;
+
+  /// Overrides the checked state shown by the leading circle — used for a
+  /// routine row, whose top-level `task.done` is unused/meaningless.
+  final bool? checkedOverride;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
+    final checked = checkedOverride ?? task.done;
 
     // The shadow belongs on the filled box, not on a transparent child inside
     // it — the previous version drew shadowSm on an inner Container with no
@@ -53,7 +74,7 @@ class TaskTile extends StatelessWidget {
             ),
             child: Row(
               children: [
-                CheckCircle(checked: task.done, onTap: onToggle),
+                CheckCircle(checked: checked, onTap: onToggle),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -61,13 +82,11 @@ class TaskTile extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        task.title,
+                        titleOverride ?? task.title,
                         style: TextStyle(
                           fontSize: 14.5,
                           color: onSurface,
-                          decoration: task.done
-                              ? TextDecoration.lineThrough
-                              : null,
+                          decoration: checked ? TextDecoration.lineThrough : null,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -76,12 +95,13 @@ class TaskTile extends StatelessWidget {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
-                            task.dueAt == null
-                                ? task.dateLabel
-                                : '${task.dateLabel} · ${task.timeLabel}',
+                            metaOverride ??
+                                (task.timeLabel.isEmpty
+                                    ? task.dateLabel
+                                    : '${task.dateLabel} · ${task.timeLabel}'),
                             style: TextStyle(
                               fontSize: 11,
-                              color: task.isOverdue
+                              color: (metaOverride != null ? metaIsAlert : task.isMissed)
                                   ? theme.colorScheme.error
                                   : onSurface.withValues(alpha: 0.55),
                             ),
