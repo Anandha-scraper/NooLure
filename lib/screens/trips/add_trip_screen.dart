@@ -99,6 +99,7 @@ class _AddTripScreenState extends State<AddTripScreen>
         const SizedBox(height: 8),
         DueField(
           dueAt: _startDate,
+          hasDueTime: false,
           onPick: () => _pickDate(isStart: true),
           onClear: () => setState(() => _startDate = null),
         ),
@@ -107,6 +108,7 @@ class _AddTripScreenState extends State<AddTripScreen>
         const SizedBox(height: 8),
         DueField(
           dueAt: _endDate,
+          hasDueTime: false,
           onPick: () => _pickDate(isStart: false),
           onClear: () => setState(() => _endDate = null),
         ),
