@@ -144,8 +144,6 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 26),
-            _UpcomingBirthdaysSection(birthdays: birthdays),
-            const SizedBox(height: 26),
             _SectionHeader(
               title: 'Today',
               onSeeAll: () => Navigator.of(context).pushNamed(AppRoutes.tasks),
@@ -178,6 +176,8 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
             ],
+            const SizedBox(height: 26),
+            _UpcomingBirthdaysSection(birthdays: birthdays),
           ],
         ),
       ),

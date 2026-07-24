@@ -10,6 +10,7 @@ import '../../providers/task_provider.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/inline_confirm_card.dart';
 import '../../widgets/tag_chip.dart';
+import '../../widgets/task_preview_sheet.dart';
 
 class TaskArchiveScreen extends StatefulWidget {
   const TaskArchiveScreen({super.key});
@@ -24,6 +25,7 @@ class _TaskArchiveScreenState extends State<TaskArchiveScreen>
   // arming a new one disarms whichever was armed before, and cleared when
   // this screen becomes visible again after a pushed route is popped.
   String? _armedId;
+  _PendingAction? _armedAction;
 
   @override
   void didChangeDependencies() {
@@ -38,7 +40,10 @@ class _TaskArchiveScreenState extends State<TaskArchiveScreen>
   }
 
   @override
-  void didPopNext() => setState(() => _armedId = null);
+  void didPopNext() => setState(() {
+    _armedId = null;
+    _armedAction = null;
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +81,7 @@ class _TaskArchiveScreenState extends State<TaskArchiveScreen>
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'swipe to unarchive',
+                      'tap to view · swipe right to unarchive · swipe left to delete',
                       style: TextStyle(
                         fontSize: 11,
                         color: onSurface.withValues(alpha: 0.45),
@@ -94,8 +99,15 @@ class _TaskArchiveScreenState extends State<TaskArchiveScreen>
                         task: task,
                         provider: provider,
                         isArmed: _armedId == task.id,
-                        onArm: () => setState(() => _armedId = task.id),
-                        onDisarm: () => setState(() => _armedId = null),
+                        armedAction: _armedId == task.id ? _armedAction : null,
+                        onArm: (action) => setState(() {
+                          _armedId = task.id;
+                          _armedAction = action;
+                        }),
+                        onDisarm: () => setState(() {
+                          _armedId = null;
+                          _armedAction = null;
+                        }),
                       );
                     },
                   ),
@@ -106,13 +118,16 @@ class _TaskArchiveScreenState extends State<TaskArchiveScreen>
   }
 }
 
-/// The armed state ([isArmed]/[onArm]/[onDisarm]) is owned by the parent
-/// screen so only one row across the page is ever armed at once.
+enum _PendingAction { restore, delete }
+
+/// The armed state ([isArmed]/[armedAction]/[onArm]/[onDisarm]) is owned by
+/// the parent screen so only one row across the page is ever armed at once.
 class _ArchiveRow extends StatelessWidget {
   const _ArchiveRow({
     required this.task,
     required this.provider,
     required this.isArmed,
+    required this.armedAction,
     required this.onArm,
     required this.onDisarm,
   });
@@ -120,7 +135,8 @@ class _ArchiveRow extends StatelessWidget {
   final TaskModel task;
   final TaskProvider provider;
   final bool isArmed;
-  final VoidCallback onArm;
+  final _PendingAction? armedAction;
+  final ValueChanged<_PendingAction> onArm;
   final VoidCallback onDisarm;
 
   @override
@@ -132,27 +148,47 @@ class _ArchiveRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: isArmed
           ? InlineConfirmCard(
-              actionIcon: LucideIcons.archiveRestore,
-              actionColor: AppColors.accent2,
-              actionLabel: 'Restore "${task.title}"',
+              actionIcon: armedAction == _PendingAction.restore
+                  ? LucideIcons.archiveRestore
+                  : LucideIcons.trash2,
+              actionColor: armedAction == _PendingAction.restore
+                  ? AppColors.accent2
+                  : theme.colorScheme.error,
+              actionLabel: armedAction == _PendingAction.restore
+                  ? 'Restore "${task.title}"'
+                  : 'Permanently delete "${task.title}"',
               height: 78,
               onConfirm: () {
-                _unarchive(context);
+                if (armedAction == _PendingAction.restore) {
+                  _unarchive(context);
+                } else {
+                  _delete(context);
+                }
                 onDisarm();
               },
               onCancel: onDisarm,
             )
           : Dismissible(
               key: ValueKey(task.id),
-              direction: DismissDirection.startToEnd,
+              direction: DismissDirection.horizontal,
               background: swipeBackground(
                 alignment: Alignment.centerLeft,
                 color: AppColors.softFill(AppColors.accent2, theme.brightness),
                 icon: LucideIcons.archiveRestore,
                 iconColor: AppColors.softInk(AppColors.accent2, theme.brightness),
               ),
+              secondaryBackground: swipeBackground(
+                alignment: Alignment.centerRight,
+                color: theme.colorScheme.error.withValues(alpha: 0.15),
+                icon: LucideIcons.trash2,
+                iconColor: theme.colorScheme.error,
+              ),
               confirmDismiss: (direction) async {
-                onArm();
+                onArm(
+                  direction == DismissDirection.startToEnd
+                      ? _PendingAction.restore
+                      : _PendingAction.delete,
+                );
                 return false;
               },
               child: DecoratedBox(
@@ -163,53 +199,57 @@ class _ArchiveRow extends StatelessWidget {
                 child: Material(
                   color: theme.cardTheme.color,
                   borderRadius: BorderRadius.circular(32),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 14,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                task.title,
-                                style: TextStyle(fontSize: 14.5, color: onSurface),
-                              ),
-                              const SizedBox(height: 4),
-                              Wrap(
-                                spacing: 8,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Text(
-                                    'Archived ${DateLabels.relativeLabel(task.archivedAt!)}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: onSurface.withValues(alpha: 0.55),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(32),
+                    onTap: () => _view(context),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 14,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  task.title,
+                                  style: TextStyle(fontSize: 14.5, color: onSurface),
+                                ),
+                                const SizedBox(height: 4),
+                                Wrap(
+                                  spacing: 8,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Archived ${DateLabels.relativeLabel(task.archivedAt!)}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: onSurface.withValues(alpha: 0.55),
+                                      ),
                                     ),
-                                  ),
-                                  TagChip(task.category),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            LucideIcons.archiveRestore,
-                            size: 18,
-                            color: AppColors.accentInk(
-                              theme.colorScheme.primary,
-                              theme.brightness,
+                                    TagChip(task.category),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
-                          tooltip: 'Unarchive',
-                          onPressed: () => _unarchive(context),
-                        ),
-                      ],
+                          IconButton(
+                            icon: Icon(
+                              LucideIcons.archiveRestore,
+                              size: 18,
+                              color: AppColors.accentInk(
+                                theme.colorScheme.primary,
+                                theme.brightness,
+                              ),
+                            ),
+                            tooltip: 'Unarchive',
+                            onPressed: () => _unarchive(context),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -218,10 +258,21 @@ class _ArchiveRow extends StatelessWidget {
     );
   }
 
+  void _view(BuildContext context) {
+    showTaskPreview(context, task, onEdit: null, onToggleDone: null);
+  }
+
   void _unarchive(BuildContext context) {
     provider.unarchiveTask(task.id);
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Task unarchived')));
+  }
+
+  void _delete(BuildContext context) {
+    provider.permanentlyDeleteTask(task.id);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Task deleted')));
   }
 }
