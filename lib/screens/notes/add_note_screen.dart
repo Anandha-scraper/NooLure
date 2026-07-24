@@ -1,15 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/theme/text_styles.dart';
 import '../../core/utils/known_categories.dart';
+import '../../core/utils/note_body_formatting.dart';
 import '../../models/note_model.dart';
 import '../../providers/note_provider.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/tag_input_field.dart';
+
+typedef _NoteSnapshot = ({String title, String body, String tag});
 
 /// Add/edit note screen — a `noteId` puts it in edit mode, pre-filling and
 /// saving over the existing note (including a pinned one, whose sticky-note
@@ -43,6 +47,17 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   bool _saving = false;
   bool _hasSavedOnce = false;
 
+  // Session-only undo/redo — never persisted, discarded the moment this
+  // screen is popped (the stacks are just fields on this State, which dies
+  // with it). See _captureHistoryOnChange for the coalescing strategy.
+  final List<_NoteSnapshot> _undoStack = [];
+  final List<_NoteSnapshot> _redoStack = [];
+  late _NoteSnapshot _baseline;
+  bool _burstActive = false;
+  bool _isApplyingHistory = false;
+  Timer? _burstTimer;
+  static const _historyCoalesceWindow = Duration(milliseconds: 800);
+
   @override
   void initState() {
     super.initState();
@@ -57,11 +72,16 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     _titleController.addListener(_scheduleAutosave);
     _bodyController.addListener(_scheduleAutosave);
     _tagController.addListener(_scheduleAutosave);
+    _baseline = _currentSnapshot();
+    _titleController.addListener(_captureHistoryOnChange);
+    _bodyController.addListener(_captureHistoryOnChange);
+    _tagController.addListener(_captureHistoryOnChange);
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _burstTimer?.cancel();
     // Flush anything typed in the last debounce window so nothing's lost —
     // no setState here, the widget is already on its way out.
     if (_dirty) {
@@ -80,6 +100,115 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
     _dirty = true;
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 800), _save);
+  }
+
+  _NoteSnapshot _currentSnapshot() => (
+    title: _titleController.text,
+    body: _bodyController.text,
+    tag: _tagController.text,
+  );
+
+  /// Coalesces a burst of typing into one undo entry, rather than one per
+  /// keystroke: the pre-burst state is pushed the moment a burst starts, and
+  /// the burst "closes" (settling a new baseline) after a pause with no
+  /// further edits — same cadence as autosave, on its own independent timer.
+  void _captureHistoryOnChange() {
+    if (_isApplyingHistory) return;
+    final current = _currentSnapshot();
+    // A selection/cursor move alone still notifies listeners; only a real
+    // content change should count as the start of a burst.
+    if (current == _baseline) return;
+    if (!_burstActive) {
+      _undoStack.add(_baseline);
+      _redoStack.clear();
+      _burstActive = true;
+      setState(() {});
+    }
+    _burstTimer?.cancel();
+    _burstTimer = Timer(_historyCoalesceWindow, _closeBurst);
+  }
+
+  void _closeBurst() {
+    _burstActive = false;
+    _baseline = _currentSnapshot();
+  }
+
+  void _applySnapshot(_NoteSnapshot snap) {
+    _isApplyingHistory = true;
+    _titleController.value = TextEditingValue(
+      text: snap.title,
+      selection: TextSelection.collapsed(offset: snap.title.length),
+    );
+    _bodyController.value = TextEditingValue(
+      text: snap.body,
+      selection: TextSelection.collapsed(offset: snap.body.length),
+    );
+    _tagController.value = TextEditingValue(
+      text: snap.tag,
+      selection: TextSelection.collapsed(offset: snap.tag.length),
+    );
+    _isApplyingHistory = false;
+    _baseline = snap;
+  }
+
+  void _undo() {
+    if (_undoStack.isEmpty) return;
+    _burstTimer?.cancel();
+    _burstActive = false;
+    final current = _currentSnapshot();
+    final previous = _undoStack.removeLast();
+    _redoStack.add(current);
+    _applySnapshot(previous);
+    setState(() {});
+  }
+
+  void _redo() {
+    if (_redoStack.isEmpty) return;
+    final current = _currentSnapshot();
+    final next = _redoStack.removeLast();
+    _undoStack.add(current);
+    _applySnapshot(next);
+    setState(() {});
+  }
+
+  /// Runs a body-formatting transform (Bullet/Checklist insert, Bold
+  /// wrap/unwrap) and applies its result. Deliberately NOT guarded by
+  /// _isApplyingHistory — this is new content the user chose to add, exactly
+  /// like typing, so it should flow through the normal autosave and
+  /// undo/redo-capture listeners like any other real edit.
+  void _applyFormatting(
+    ({String body, int caretOffset}) Function(String, int) transform,
+  ) {
+    final selection = _bodyController.selection;
+    final caretOffset = selection.isValid
+        ? selection.start
+        : _bodyController.text.length;
+    final result = transform(_bodyController.text, caretOffset);
+    _bodyController.value = TextEditingValue(
+      text: result.body,
+      selection: TextSelection.collapsed(offset: result.caretOffset),
+    );
+  }
+
+  void _handleBullet() => _applyFormatting(applyBulletToBody);
+
+  void _handleChecklist() => _applyFormatting(applyChecklistToBody);
+
+  void _handleBold() => _applyFormatting(applyBoldToBody);
+
+  /// Flutter updates the controller's selection to the tapped caret position
+  /// before invoking onTap, so this can inspect exactly where the tap landed
+  /// to detect "the user tapped a checklist glyph" vs. ordinary caret
+  /// placement for editing an item's label.
+  void _handleBodyTap() {
+    final caretOffset = _bodyController.selection.start;
+    if (caretOffset < 0) return;
+    final result = toggleChecklistAtOffset(_bodyController.text, caretOffset);
+    if (result == null) return;
+    _bodyController.value = TextEditingValue(
+      text: result.body,
+      selection: TextSelection.collapsed(offset: result.caretOffset),
+    );
   }
 
   /// Builds the note to persist, or `null` while there's nothing worth
@@ -143,6 +272,12 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
           ),
         ),
       ],
+      bottomBar: _UndoRedoBar(
+        canUndo: _undoStack.isNotEmpty,
+        canRedo: _redoStack.isNotEmpty,
+        onUndo: _undo,
+        onRedo: _redo,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
         child: Column(
@@ -172,9 +307,16 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
               height: 1,
               color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            _FormattingToolbar(
+              onBullet: _handleBullet,
+              onChecklist: _handleChecklist,
+              onBold: _handleBold,
+            ),
+            const SizedBox(height: 8),
             TextField(
               controller: _bodyController,
+              onTap: _handleBodyTap,
               maxLines: null,
               minLines: 6,
               textAlignVertical: TextAlignVertical.top,
@@ -192,6 +334,85 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                 disabledBorder: InputBorder.none,
                 focusedErrorBorder: InputBorder.none,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FormattingToolbar extends StatelessWidget {
+  const _FormattingToolbar({
+    required this.onBullet,
+    required this.onChecklist,
+    required this.onBold,
+  });
+
+  final VoidCallback onBullet;
+  final VoidCallback onChecklist;
+  final VoidCallback onBold;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          icon: const Icon(LucideIcons.list),
+          tooltip: 'Bullet list',
+          visualDensity: VisualDensity.compact,
+          onPressed: onBullet,
+        ),
+        IconButton(
+          icon: const Icon(LucideIcons.listChecks),
+          tooltip: 'Checklist',
+          visualDensity: VisualDensity.compact,
+          onPressed: onChecklist,
+        ),
+        IconButton(
+          icon: const Icon(LucideIcons.bold),
+          tooltip: 'Bold',
+          visualDensity: VisualDensity.compact,
+          onPressed: onBold,
+        ),
+      ],
+    );
+  }
+}
+
+class _UndoRedoBar extends StatelessWidget {
+  const _UndoRedoBar({
+    required this.canUndo,
+    required this.canRedo,
+    required this.onUndo,
+    required this.onRedo,
+  });
+
+  final bool canUndo;
+  final bool canRedo;
+  final VoidCallback onUndo;
+  final VoidCallback onRedo;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(LucideIcons.undo2),
+              tooltip: 'Undo',
+              onPressed: canUndo ? onUndo : null,
+            ),
+            IconButton(
+              icon: const Icon(LucideIcons.redo2),
+              tooltip: 'Redo',
+              onPressed: canRedo ? onRedo : null,
             ),
           ],
         ),

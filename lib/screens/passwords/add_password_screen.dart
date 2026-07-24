@@ -50,6 +50,9 @@ class _AddPasswordScreenState extends State<AddPasswordScreen> {
   late final _urlController = TextEditingController(
     text: widget.existing?.url ?? '',
   );
+  late final _secretController = TextEditingController(
+    text: widget.existing?.secret ?? '',
+  );
 
   Timer? _debounce;
   bool _dirty = false;
@@ -67,6 +70,7 @@ class _AddPasswordScreenState extends State<AddPasswordScreen> {
     _usernameController.addListener(_scheduleAutosave);
     _passwordController.addListener(_scheduleAutosave);
     _urlController.addListener(_scheduleAutosave);
+    _secretController.addListener(_scheduleAutosave);
   }
 
   @override
@@ -88,6 +92,7 @@ class _AddPasswordScreenState extends State<AddPasswordScreen> {
     _usernameController.dispose();
     _passwordController.dispose();
     _urlController.dispose();
+    _secretController.dispose();
     super.dispose();
   }
 
@@ -106,6 +111,7 @@ class _AddPasswordScreenState extends State<AddPasswordScreen> {
       username: _usernameController.text.trim(),
       password: _passwordController.text,
       url: _urlController.text.trim(),
+      secret: _secretController.text,
     );
   }
 
@@ -182,6 +188,18 @@ class _AddPasswordScreenState extends State<AddPasswordScreen> {
               tooltip: _obscure ? 'Show' : 'Hide',
               onPressed: () => setState(() => _obscure = !_obscure),
             ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Passcode / Secret Phrase',
+            style: TextStyles.sectionLabel(color: onSurface),
+          ),
+          const SizedBox(height: 8),
+          CustomTextField(
+            controller: _secretController,
+            hintText: 'Optional — PIN, recovery phrase, etc.',
+            maxLines: 4,
+            borderRadius: BorderRadius.circular(22),
           ),
           const SizedBox(height: 18),
           Text('URL', style: TextStyles.sectionLabel(color: onSurface)),

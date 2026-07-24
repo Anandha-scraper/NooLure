@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../core/theme/text_styles.dart';
-import '../core/utils/linkify_text.dart';
+import '../core/utils/boldify_text.dart';
 import '../models/note_model.dart';
 import 'tag_chip.dart';
 
@@ -86,10 +86,15 @@ class _NotePreviewSheet extends StatelessWidget {
                       if (note.body.isNotEmpty)
                         SelectableText.rich(
                           TextSpan(
-                            children: linkify(
+                            children: formatNoteBody(
                               note.body,
                               baseStyle: TextStyle(
                                 fontSize: 13.5,
+                                color: onSurface.withValues(alpha: 0.8),
+                              ),
+                              boldStyle: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
                                 color: onSurface.withValues(alpha: 0.8),
                               ),
                               linkStyle: TextStyle(
