@@ -1,0 +1,484 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
+
+import '../../core/constants/app_colors.dart';
+import '../../core/routes/app_routes.dart';
+import '../../core/theme/text_styles.dart';
+import '../../core/utils/routine_occurrence.dart';
+import '../../models/birthday_model.dart';
+import '../../models/task_model.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/birthday_provider.dart';
+import '../../providers/task_provider.dart';
+import '../../widgets/app_drawer.dart';
+import '../../widgets/avatar_circle.dart';
+import '../../widgets/card_container.dart';
+import '../../widgets/home_fab.dart';
+import '../../widgets/inline_confirm_card.dart';
+import '../../widgets/loading_widget.dart';
+import '../../widgets/segmented_control.dart';
+import '../../widgets/task_preview_sheet.dart';
+import '../../widgets/task_tile.dart';
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final user = context.watch<AuthProvider>().currentUser;
+    final tasks = context.watch<TaskProvider>();
+    final birthdays = context.watch<BirthdayProvider>().birthdays;
+    final firstName = (user?.name ?? '').split(' ').first;
+    final onSurface = theme.colorScheme.onSurface;
+
+    final doneCount = tasks.todayDoneCount;
+    final totalCount = tasks.todayTotalCount;
+    final progress = totalCount == 0 ? 0.0 : doneCount / totalCount;
+
+    return Scaffold(
+      drawer: const AppDrawer(currentRoute: AppRoutes.home),
+      floatingActionButton: HomeFab(
+        onTask: () => Navigator.of(context).pushNamed(AppRoutes.addTask),
+        onNote: () => Navigator.of(context).pushNamed(AppRoutes.addNote),
+        onBirthday: () =>
+            Navigator.of(context).pushNamed(AppRoutes.addBirthday),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+          children: [
+            Row(
+              children: [
+                Builder(
+                  builder: (context) => IconButton(
+                    icon: const Icon(LucideIcons.menu),
+                    tooltip: 'Menu',
+                    onPressed: () => Scaffold.of(context).openDrawer(),
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text(
+                        '${_greeting()}, $firstName',
+                        style: TextStyles.h4(color: onSurface),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        DateFormat('EEEE, MMMM d').format(DateTime.now()),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: onSurface.withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      icon: const Icon(LucideIcons.bell),
+                      onPressed: () {},
+                    ),
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            CardContainer(
+              elevation: CardElevation.md,
+              child: Row(
+                children: [
+                  CircularProgressRing(
+                    percent: progress,
+                    size: 72,
+                    child: Text(
+                      '${(progress * 100).round()}%',
+                      style: TextStyles.heading(size: 15, color: onSurface),
+                    ),
+                  ),
+                  const SizedBox(width: 18),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CardKicker("Today's focus"),
+                        CardTitle('$doneCount of $totalCount tasks done'),
+                        const SizedBox(height: 2),
+                        CardMeta(
+                          totalCount == 0
+                              ? 'Nothing due today — enjoy the space'
+                              : doneCount == totalCount
+                              ? 'All done — enjoy your day'
+                              : 'Keep going — almost there',
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 26),
+            _SectionHeader(
+              title: 'Today',
+              onSeeAll: () => Navigator.of(context).pushNamed(AppRoutes.tasks),
+            ),
+            const SizedBox(height: 10),
+            if (tasks.homeTasks.isEmpty)
+              const _EmptyHint('Nothing on your plate — tap + to add a task')
+            else
+              for (final display in tasks.homeTasks)
+                _HomeTaskRow(display: display, provider: tasks),
+            if (tasks.homeTasks.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'swipe to complete →',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: onSurface.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  Text(
+                    '← swipe to view',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: onSurface.withValues(alpha: 0.45),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 26),
+            _UpcomingBirthdaysSection(birthdays: birthdays),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Today's swipeable task row — swipe-right marks done, but instead of a
+/// popup confirmation the card itself flips into an inline confirm/cancel
+/// row (see [InlineConfirmCard]); swipe-left still opens the preview sheet
+/// directly, since that's not a destructive action. Branches on whether
+/// [display] is an ordinary open task or a routine's still-open today
+/// occurrence (see [_buildRoutineSection]) — `TaskProvider.homeTasks` never
+/// surfaces a routine here once today is resolved, so this row is always
+/// swipeable-to-complete for a routine, same as a plain task.
+class _HomeTaskRow extends StatefulWidget {
+  const _HomeTaskRow({required this.display, required this.provider});
+
+  final HomeTaskDisplay display;
+  final TaskProvider provider;
+
+  @override
+  State<_HomeTaskRow> createState() => _HomeTaskRowState();
+}
+
+class _HomeTaskRowState extends State<_HomeTaskRow> {
+  bool _confirming = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (widget.display) {
+      HomePlainTask(:final task) => _buildRow(
+        context,
+        key: ValueKey(task.id),
+        confirmLabel: 'Mark "${task.title}" as done',
+        tile: TaskTile(task: task, dense: true),
+        onConfirm: () => widget.provider.toggleDone(task.id),
+        onPreview: () => showTaskPreview(
+          context,
+          task,
+          onEdit: null,
+          onToggleDone: () => widget.provider.toggleDone(task.id),
+        ),
+      ),
+      HomeRoutineOccurrence(:final task) => _buildRoutineSection(context, task),
+    };
+  }
+
+  /// `TaskProvider.homeTasks` only ever surfaces a routine here while today's
+  /// occurrence is still open (`upcoming`/`dueNow`/`dueLate`), so this is
+  /// always the swipeable row — never a closed/history one. The full
+  /// day-by-day history lives in the preview sheet (`showTaskPreview`),
+  /// reachable via swipe-left.
+  Widget _buildRoutineSection(BuildContext context, TaskModel task) {
+    final routine = task.routine!;
+    final now = DateTime.now();
+    final dayNumber = dayNumberFor(routine, now)!;
+    final status = todaysOccurrence(routine, now: now);
+
+    return _buildRow(
+      context,
+      key: ValueKey('${task.id}-$dayNumber'),
+      confirmLabel: 'Mark Day $dayNumber done',
+      tile: TaskTile(
+        task: task,
+        dense: true,
+        titleOverride: 'Day $dayNumber · ${task.title}',
+        metaOverride: preferredWindowLabel(routine) ?? 'Due today',
+        metaIsAlert: status == RoutineOccurrenceStatus.dueLate,
+        checkedOverride: false,
+      ),
+      onConfirm: () =>
+          widget.provider.completeRoutineOccurrence(task.id, DateTime.now()),
+      // No completion snackbar here — that only ever fires from the
+      // Tasks page (see task_screen.dart), per the request's explicit
+      // "in tasks pages view port only".
+      onPreview: () =>
+          showTaskPreview(context, task, onEdit: null, onToggleDone: null),
+    );
+  }
+
+  Widget _buildRow(
+    BuildContext context, {
+    required Key key,
+    required String confirmLabel,
+    required Widget tile,
+    required VoidCallback onConfirm,
+    required Future<void> Function() onPreview,
+  }) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: _confirming
+          ? InlineConfirmCard(
+              actionIcon: LucideIcons.check,
+              actionColor: AppColors.accent2,
+              actionLabel: confirmLabel,
+              height: 56,
+              onConfirm: () {
+                onConfirm();
+                setState(() => _confirming = false);
+              },
+              onCancel: () => setState(() => _confirming = false),
+            )
+          : Dismissible(
+              key: key,
+              background: swipeBackground(
+                alignment: Alignment.centerLeft,
+                color: AppColors.softFill(
+                  AppColors.accent2,
+                  theme.brightness,
+                ),
+                icon: LucideIcons.check,
+                iconColor: AppColors.softInk(
+                  AppColors.accent2,
+                  theme.brightness,
+                ),
+              ),
+              secondaryBackground: swipeBackground(
+                alignment: Alignment.centerRight,
+                color: AppColors.softFill(
+                  theme.colorScheme.primary,
+                  theme.brightness,
+                ),
+                icon: LucideIcons.eye,
+                iconColor: AppColors.softInk(
+                  theme.colorScheme.primary,
+                  theme.brightness,
+                ),
+              ),
+              confirmDismiss: (direction) async {
+                if (direction == DismissDirection.startToEnd) {
+                  setState(() => _confirming = true);
+                } else {
+                  await onPreview();
+                }
+                return false;
+              },
+              child: tile,
+            ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, required this.onSeeAll});
+
+  final String title;
+  final VoidCallback onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: TextStyles.heading(
+            size: 16,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        GestureDetector(
+          onTap: onSeeAll,
+          child: Text(
+            'See all',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.accentInk(
+                theme.colorScheme.primary,
+                theme.brightness,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyHint extends StatelessWidget {
+  const _EmptyHint(this.message);
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Text(
+        message,
+        style: TextStyle(
+          fontSize: 13,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+        ),
+      ),
+    );
+  }
+}
+
+enum _BirthdayScope { month, week }
+
+class _UpcomingBirthdaysSection extends StatefulWidget {
+  const _UpcomingBirthdaysSection({required this.birthdays});
+
+  final List<BirthdayModel> birthdays;
+
+  @override
+  State<_UpcomingBirthdaysSection> createState() =>
+      _UpcomingBirthdaysSectionState();
+}
+
+class _UpcomingBirthdaysSectionState extends State<_UpcomingBirthdaysSection> {
+  _BirthdayScope _scope = _BirthdayScope.month;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final accentInk = AppColors.accentInk(
+      theme.colorScheme.primary,
+      theme.brightness,
+    );
+    final now = DateTime.now();
+    final scoped = widget.birthdays.where((b) {
+      return _scope == _BirthdayScope.week
+          ? b.daysUntil <= 7
+          : b.nextOccurrence.year == now.year &&
+                b.nextOccurrence.month == now.month;
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(
+          title: 'Upcoming birthdays',
+          onSeeAll: () => Navigator.of(context).pushNamed(AppRoutes.birthdays),
+        ),
+        const SizedBox(height: 10),
+        AppSegmentedControl<_BirthdayScope>(
+          value: _scope,
+          onChanged: (v) => setState(() => _scope = v),
+          options: const [
+            (_BirthdayScope.month, 'Month'),
+            (_BirthdayScope.week, 'Week'),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (scoped.isEmpty)
+          _EmptyHint(
+            _scope == _BirthdayScope.week
+                ? 'No birthdays this week'
+                : 'No birthdays this month',
+          )
+        else
+          SizedBox(
+            height: 104,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: scoped.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 16),
+              itemBuilder: (context, i) {
+                final b = scoped[i];
+                return GestureDetector(
+                  onTap: () => Navigator.of(
+                    context,
+                  ).pushNamed(AppRoutes.birthdayDetail, arguments: b.id),
+                  child: SizedBox(
+                    width: 64,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AvatarCircle(initials: b.initials, size: 52),
+                        const SizedBox(height: 6),
+                        Text(
+                          b.name,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: onSurface.withValues(alpha: 0.8),
+                          ),
+                        ),
+                        Text(
+                          b.daysLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 10, color: accentInk),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+}

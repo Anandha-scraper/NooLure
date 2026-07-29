@@ -1,0 +1,126 @@
+name: Preview Distribution
+on:
+  push:
+    branches:
+      - preview
+permissions:
+  contents: read
+
+env:
+  FIREBASE_TESTER_GROUP: "preview"
+
+jobs:
+  build-and-distribute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify applicationId is a valid reverse-domain identifier
+        run: |
+          APP_ID=$(grep -oP '(?<=applicationId = ")[^"]+' android/app/build.gradle.kts)
+          echo "Detected applicationId: $APP_ID"
+          if ! echo "$APP_ID" | grep -qP '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'; then
+            echo "::error::applicationId '$APP_ID' is not a valid lowercase reverse-domain identifier (e.g. com.noolure.app)."
+            exit 1
+          fi
+          FIRST_SEGMENT=$(echo "$APP_ID" | awk -F. '{print $1}')
+          LAST_SEGMENT=$(echo "$APP_ID" | awk -F. '{print $NF}')
+          if echo "$LAST_SEGMENT" | grep -qP '^(com|net|org|io|gov|edu)$' && [ "$FIRST_SEGMENT" = "$LAST_SEGMENT" ]; then
+            echo "::error::applicationId '$APP_ID' repeats its TLD as the last segment (e.g. com.foo.com) — pick a real reverse-domain identifier."
+            exit 1
+          fi
+          echo "applicationId format OK."
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Dart/Flutter dependencies
+        run: flutter pub get
+
+      - name: Decode Firebase config (google-services.json) from secret
+        run: |
+          echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > android/app/google-services.json
+          test -s android/app/google-services.json || { echo "::error::android/app/google-services.json decoded empty — check the GOOGLE_SERVICES_JSON secret."; exit 1; }
+
+      - name: Decode release keystore from secret
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release-keystore.jks
+          test -s android/app/release-keystore.jks || { echo "::error::android/app/release-keystore.jks decoded empty — check the ANDROID_KEYSTORE_BASE64 secret."; exit 1; }
+
+      - name: Write key.properties for Gradle release signing
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          [ -n "$STORE_PASSWORD" ] || { echo "::error::ANDROID_KEYSTORE_PASSWORD secret is empty."; exit 1; }
+          [ -n "$KEY_PASSWORD" ] || { echo "::error::ANDROID_KEY_PASSWORD secret is empty."; exit 1; }
+          [ -n "$KEY_ALIAS" ] || { echo "::error::ANDROID_KEY_ALIAS secret is empty."; exit 1; }
+          {
+            printf 'storePassword=%s\n' "${STORE_PASSWORD//\\/\\\\}"
+            printf 'keyPassword=%s\n' "${KEY_PASSWORD//\\/\\\\}"
+            printf 'keyAlias=%s\n' "${KEY_ALIAS//\\/\\\\}"
+            printf 'storeFile=%s\n' "release-keystore.jks"
+          } > android/key.properties
+
+      - name: Build signed release APK
+        run: flutter build apk --release --build-number=${{ github.run_number }} -v
+
+      - name: Install firebase-tools
+        run: npm install -g firebase-tools@13
+
+      - name: Authenticate firebase-tools with the service account
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+
+      - name: Delete previous Firebase App Distribution releases
+        env:
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+        run: |
+          set +e
+          RELEASES_JSON=$(firebase appdistribution:releases:list --app "$FIREBASE_APP_ID" --json 2>"$RUNNER_TEMP/releases-list.err")
+          RELEASES_ERR=$(cat "$RUNNER_TEMP/releases-list.err")
+          if echo "$RELEASES_JSON" | jq -e . >/dev/null 2>&1; then
+            echo "$RELEASES_JSON" | jq -r '(.result // .releases // [])[]?.name // empty' | while read -r RELEASE_NAME; do
+              [ -n "$RELEASE_NAME" ] && firebase appdistribution:releases:delete "$RELEASE_NAME" --app "$FIREBASE_APP_ID" --force
+            done
+          else
+            echo "::warning::Could not list existing Firebase releases — skipping cleanup, new release will still be uploaded. CLI stderr: $RELEASES_ERR"
+          fi
+          set -e
+
+      - name: Build release notes (commit message + short SHA)
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          DELIM="RELEASE_NOTES_EOF_$(date +%s%N)"
+          {
+            echo "RELEASE_NOTES<<$DELIM"
+            printf '%s (%s)\n' "$COMMIT_MESSAGE" "$SHORT_SHA"
+            echo "$DELIM"
+          } >> "$GITHUB_ENV"
+
+      - name: Distribute to Firebase App Distribution
+        env:
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+          RELEASE_NOTES: ${{ env.RELEASE_NOTES }}
+        run: |
+          firebase appdistribution:distribute \
+            build/app/outputs/flutter-apk/app-release.apk \
+            --app "$FIREBASE_APP_ID" \
+            --release-notes "$RELEASE_NOTES" \
+            --groups "$FIREBASE_TESTER_GROUP"

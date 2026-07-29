@@ -1,0 +1,12 @@
+.claude
+.dart_tool
+.flutter-plugins-dependencies
+.idea
+test
+build
+linux
+.metadata
+CLAUDE.md
+firebase_app_distribution.md
+pubspec.lock
+README.md

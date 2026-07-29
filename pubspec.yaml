@@ -1,0 +1,65 @@
+name: noolure
+description: "A new Flutter project."
+publish_to: 'none' 
+version: 1.0.0+1
+environment:
+  sdk: ^3.12.2
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.5+1
+  google_fonts: ^8.1.0
+  intl: ^0.20.3
+  shared_preferences: ^2.5.5
+  percent_indicator: ^4.2.5
+  lucide_icons_flutter: ^3.1.15
+  firebase_core: ^3.11.0
+  firebase_database: ^11.3.1
+  uuid: ^4.5.3
+  hive_ce: ^2.19.3
+  hive_ce_flutter: ^2.3.4
+  google_sign_in: ^7.2.0
+  firebase_auth: ^5.7.0
+  cryptography: ^2.7.0
+  url_launcher: ^6.3.0
+
+# jni is a transitive dependency (pulled in by google_sign_in_android and
+# firebase_database) under a bare `^1.0.0` constraint. 1.0.1's android/build.gradle
+# unconditionally calls a `kotlin { ... }` block assuming AGP 9's built-in Kotlin is
+# active, but this project's Flutter version requires android.newDsl=false /
+# android.builtInKotlin=false (the Flutter Gradle plugin itself fails outright
+# under the new DSL), so that block has no provider and fails with
+# "Could not find method kotlin()". 1.0.2 (published 2026-07-28) removed it —
+# pin to that or newer so a fresh `flutter pub get` (as CI always does; pubspec.lock
+# is gitignored here) can't drift back onto the broken 1.0.1.
+dependency_overrides:
+  jni: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
+flutter_native_splash:
+  color: "#F8E1B7"
+  color_dark: "#2A2216"
+  android: true
+  ios: false
+  web: false
+  android_12:
+    icon_background_color: "#F8E1B7"
+    icon_background_color_dark: "#2A2216"
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icons/appicon_square.png"
+  adaptive_icon_background: "#F8E1B7" # AppColors.bg
+  adaptive_icon_foreground: "assets/icons/appicon_foreground.png"
+  remove_alpha_ios: true
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/

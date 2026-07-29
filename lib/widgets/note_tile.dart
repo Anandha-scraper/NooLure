@@ -1,0 +1,198 @@
+import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+import '../core/constants/app_colors.dart';
+import '../core/theme/text_styles.dart';
+import '../models/note_model.dart';
+import 'card_container.dart';
+import 'tag_chip.dart';
+
+/// Regular note card shown in the 2-column grid.
+class NoteTile extends StatelessWidget {
+  const NoteTile({super.key, required this.note, this.onTap, this.onLongPress});
+
+  final NoteModel note;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: CardContainer(
+        elevation: CardElevation.sm,
+        // The meta line is deliberately pinned to the bottom via
+        // spaceBetween — a short one-line title with no body would otherwise
+        // leave dead space under it while a full title+body card fills edge
+        // to edge, making cards of different content lengths look
+        // inconsistent even though the outer box is already uniform-sized.
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TagChip(note.tag),
+                if (note.isImage) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.softFill(
+                            theme.colorScheme.primary,
+                            theme.brightness,
+                          ),
+                          AppColors.softFill(
+                            AppColors.accent2,
+                            theme.brightness,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Text(
+                  note.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyles.cardTitle(context),
+                ),
+                if (note.body.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    note.body,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyles.cardBody(context),
+                  ),
+                ],
+              ],
+            ),
+            CardMeta('Edited ${note.editedLabel}'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The pinned "sticky note" highlight card with a mini checklist preview.
+///
+/// Keeps the yellow hue as its identity, but derives the actual fill/ink from
+/// [AppColors.softFill]/[AppColors.softInk] so it reads as a pale tint in
+/// light mode and a muted deep gold in dark mode instead of one fixed hex
+/// pair that stays glaring regardless of theme.
+class PinnedNoteCard extends StatelessWidget {
+  const PinnedNoteCard({
+    super.key,
+    required this.note,
+    required this.onToggleItem,
+    this.onTap,
+    this.onLongPress,
+  });
+
+  final NoteModel note;
+  final ValueChanged<String> onToggleItem;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final fill = AppColors.softFill(AppColors.highlight, brightness);
+    final ink = AppColors.softInk(AppColors.highlight, brightness);
+
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: CardContainer(
+        color: fill,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ink.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    note.tag,
+                    style: TextStyle(fontSize: 11, color: ink),
+                  ),
+                ),
+                Icon(LucideIcons.pin, size: 14, color: ink),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              note.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              // Caprasimo, matching NoteTile's title — these two cards sit
+              // side by side and used to render the same element in different
+              // typefaces.
+              style: TextStyles.heading(size: 17, color: ink),
+            ),
+            const SizedBox(height: 6),
+            for (final item in note.checklist)
+              GestureDetector(
+                onTap: () => onToggleItem(item.id),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      if (item.done)
+                        Icon(LucideIcons.check, size: 13, color: ink)
+                      else
+                        Container(
+                          width: 13,
+                          height: 13,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: ink, width: 1.5),
+                          ),
+                        ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: ink,
+                            decoration: item.done
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -1,0 +1,165 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
+
+import '../core/data/repositories.dart';
+import '../core/data/repository.dart';
+import '../models/note_model.dart';
+
+class NoteProvider extends ChangeNotifier {
+  NoteProvider({Repository<NoteModel>? repository})
+    : _repository = repository ?? Repositories.notes {
+    _apply(_repository.all());
+    _subscription = _repository.watch().skip(1).listen(_apply);
+  }
+
+  void _apply(List<NoteModel> notes) {
+    _allNotes = notes;
+    _notes = notes.where((n) => !n.isDeleted && !n.isArchived).toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    notifyListeners();
+  }
+
+  final Repository<NoteModel> _repository;
+  static const _uuid = Uuid();
+
+  StreamSubscription<List<NoteModel>>? _subscription;
+  List<NoteModel> _allNotes = [];
+  List<NoteModel> _notes = [];
+
+  List<NoteModel> get notes => List.unmodifiable(_notes);
+
+  NoteModel? get pinnedNote {
+    for (final n in _notes) {
+      if (n.isPinned) return n;
+    }
+    return null;
+  }
+
+  List<NoteModel> get gridNotes => _notes.where((n) => !n.isPinned).toList();
+
+  List<String> get availableTags {
+    final tags = _notes.map((n) => n.tag).toSet().toList()..sort();
+    return ['All', ...tags];
+  }
+
+  List<NoteModel> filteredGridNotes(String tag) {
+    if (tag == 'All') return gridNotes;
+    return gridNotes.where((n) => n.tag == tag).toList();
+  }
+
+  NoteModel? byId(String id) {
+    for (final n in _notes) {
+      if (n.id == id) return n;
+    }
+    return null;
+  }
+
+  Future<void> toggleChecklistItem(String noteId, String itemId) async {
+    final note = byId(noteId);
+    if (note == null) return;
+    await _repository.save(
+      note.copyWith(
+        checklist: [
+          for (final c in note.checklist)
+            c.id == itemId ? c.copyWith(done: !c.done) : c,
+        ],
+      ),
+    );
+  }
+
+  Future<void> togglePinned(String id) async {
+    final note = byId(id);
+    if (note == null) return;
+    // Pinning isn't a content edit — keep the existing updatedAt so "Edited
+    // X ago" only reflects actual title/body/checklist changes.
+    await _repository.save(
+      note.copyWith(isPinned: !note.isPinned, updatedAt: note.updatedAt),
+    );
+  }
+
+  Future<void> addNote({
+    required String title,
+    required String body,
+    required String tag,
+  }) async {
+    final now = DateTime.now();
+    await _repository.save(
+      NoteModel(
+        id: _uuid.v4(),
+        title: title,
+        body: body,
+        tag: tag,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  Future<void> updateNote(NoteModel note) => _repository.save(note);
+
+  List<NoteModel> get trashedNotes {
+    final trashed = _allNotes.where((n) => n.isDeleted).toList();
+    trashed.sort((a, b) => b.deletedAt!.compareTo(a.deletedAt!));
+    return trashed;
+  }
+
+  int get trashCount => _allNotes.where((n) => n.isDeleted).length;
+
+  Future<void> trashNote(String id) async {
+    final note = _findInAll(id);
+    if (note == null) return;
+    await _repository.save(note.copyWith(deletedAt: DateTime.now()));
+  }
+
+  Future<void> restoreNote(String id) async {
+    final note = _findInAll(id);
+    if (note == null) return;
+    await _repository.save(note.copyWith(clearDeletedAt: true));
+  }
+
+  Future<void> permanentlyDeleteNote(String id) => _repository.delete(id);
+
+  Future<void> emptyTrash() async {
+    for (final n in trashedNotes) {
+      await _repository.delete(n.id);
+    }
+  }
+
+  List<NoteModel> get archivedNotes {
+    final archived = _allNotes
+        .where((n) => n.isArchived && !n.isDeleted)
+        .toList();
+    archived.sort((a, b) => b.archivedAt!.compareTo(a.archivedAt!));
+    return archived;
+  }
+
+  int get archiveCount =>
+      _allNotes.where((n) => n.isArchived && !n.isDeleted).length;
+
+  Future<void> archiveNote(String id) async {
+    final note = _findInAll(id);
+    if (note == null) return;
+    await _repository.save(note.copyWith(archivedAt: DateTime.now()));
+  }
+
+  Future<void> unarchiveNote(String id) async {
+    final note = _findInAll(id);
+    if (note == null) return;
+    await _repository.save(note.copyWith(clearArchivedAt: true));
+  }
+
+  NoteModel? _findInAll(String id) {
+    for (final n in _allNotes) {
+      if (n.id == id) return n;
+    }
+    return null;
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+}
