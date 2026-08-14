@@ -6,7 +6,4 @@ test
 build
 linux
 .metadata
-CLAUDE.md
-firebase_app_distribution.md
 pubspec.lock
-README.md
