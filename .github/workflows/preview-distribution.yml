@@ -4,11 +4,14 @@ on:
     branches:
       - preview
 permissions:
-  contents: write
+  contents: read
+  # NOTE: GitHub Release publishing is disabled below (commented out).
+  # If you re-enable it, this must be changed back to `contents: write`
+  # or the "Create GitHub Release" / "Delete old GitHub Releases" steps will fail.
 
 env:
   FIREBASE_TESTER_GROUP: "preview"
-  RELEASES_TO_KEEP: "1"
+  # RELEASES_TO_KEEP: "1" # only used by the GitHub Release steps below
 
 jobs:
   build-and-distribute:
@@ -109,34 +112,39 @@ jobs:
             echo "$DELIM"
           } >> "$GITHUB_ENV"
 
-      - name: Determine release version tag
-        run: |
-          VERSION_NAME=$(grep -oP '(?<=^version: )[0-9]+\.[0-9]+\.[0-9]+' pubspec.yaml)
-          RELEASE_TAG="preview-v${VERSION_NAME}-${{ github.run_number }}"
-          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
-          echo "Release tag: $RELEASE_TAG"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: ${{ env.RELEASE_TAG }}
-          body: ${{ env.RELEASE_NOTES }}
-          prerelease: true
-          target_commitish: ${{ github.sha }}
-          files: build/app/outputs/flutter-apk/app-release.apk
-
-      - name: Delete old GitHub Releases (keep newest ${{ env.RELEASES_TO_KEEP }})
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release list --repo "${{ github.repository }}" --limit 100 --json tagName,createdAt \
-            --jq 'sort_by(.createdAt) | reverse | .[] | select(.tagName | startswith("preview-")) | .tagName' \
-            | tail -n +$(( RELEASES_TO_KEEP + 1 )) \
-            | while read -r TAG; do
-                echo "Deleting old release: $TAG"
-                gh release delete "$TAG" --repo "${{ github.repository }}" --yes --cleanup-tag
-              done
+      # --- GitHub Release publishing (currently disabled — not needed right now) ---
+      # To re-enable: uncomment the 3 steps below AND change `permissions.contents`
+      # back to `write` and uncomment `RELEASES_TO_KEEP` near the top of this file.
+      #
+      # - name: Determine release version tag
+      #   run: |
+      #     VERSION_NAME=$(grep -oP '(?<=^version: )[0-9]+\.[0-9]+\.[0-9]+' pubspec.yaml)
+      #     RELEASE_TAG="preview-v${VERSION_NAME}-${{ github.run_number }}"
+      #     echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+      #     echo "Release tag: $RELEASE_TAG"
+      #
+      # - name: Create GitHub Release
+      #   uses: softprops/action-gh-release@v2
+      #   with:
+      #     tag_name: ${{ env.RELEASE_TAG }}
+      #     name: ${{ env.RELEASE_TAG }}
+      #     body: ${{ env.RELEASE_NOTES }}
+      #     prerelease: true
+      #     target_commitish: ${{ github.sha }}
+      #     files: build/app/outputs/flutter-apk/app-release.apk
+      #
+      # - name: Delete old GitHub Releases (keep newest ${{ env.RELEASES_TO_KEEP }})
+      #   env:
+      #     GH_TOKEN: ${{ github.token }}
+      #   run: |
+      #     gh release list --repo "${{ github.repository }}" --limit 100 --json tagName,createdAt \
+      #       --jq 'sort_by(.createdAt) | reverse | .[] | select(.tagName | startswith("preview-")) | .tagName' \
+      #       | tail -n +$(( RELEASES_TO_KEEP + 1 )) \
+      #       | while read -r TAG; do
+      #           echo "Deleting old release: $TAG"
+      #           gh release delete "$TAG" --repo "${{ github.repository }}" --yes --cleanup-tag
+      #         done
+      # --- end GitHub Release publishing ---
 
       - name: Distribute to Firebase App Distribution
         env:
