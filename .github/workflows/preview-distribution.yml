@@ -4,10 +4,11 @@ on:
     branches:
       - preview
 permissions:
-  contents: read
+  contents: write
 
 env:
   FIREBASE_TESTER_GROUP: "preview"
+  RELEASES_TO_KEEP: "1"
 
 jobs:
   build-and-distribute:
@@ -107,6 +108,35 @@ jobs:
             printf '%s (%s)\n' "$COMMIT_MESSAGE" "$SHORT_SHA"
             echo "$DELIM"
           } >> "$GITHUB_ENV"
+
+      - name: Determine release version tag
+        run: |
+          VERSION_NAME=$(grep -oP '(?<=^version: )[0-9]+\.[0-9]+\.[0-9]+' pubspec.yaml)
+          RELEASE_TAG="preview-v${VERSION_NAME}-${{ github.run_number }}"
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+          echo "Release tag: $RELEASE_TAG"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
+          body: ${{ env.RELEASE_NOTES }}
+          prerelease: true
+          target_commitish: ${{ github.sha }}
+          files: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Delete old GitHub Releases (keep newest ${{ env.RELEASES_TO_KEEP }})
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --repo "${{ github.repository }}" --limit 100 --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[] | select(.tagName | startswith("preview-")) | .tagName' \
+            | tail -n +$(( RELEASES_TO_KEEP + 1 )) \
+            | while read -r TAG; do
+                echo "Deleting old release: $TAG"
+                gh release delete "$TAG" --repo "${{ github.repository }}" --yes --cleanup-tag
+              done
 
       - name: Distribute to Firebase App Distribution
         env:
