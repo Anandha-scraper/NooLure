@@ -193,9 +193,11 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 8),
           for (final row in _settingsRows)
             InkWell(
-              onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${row.label} coming soon')),
-              ),
+              onTap: row.label == 'About'
+                  ? () => Navigator.of(context).pushNamed(AppRoutes.about)
+                  : () => ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${row.label} coming soon')),
+                    ),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   vertical: 13,

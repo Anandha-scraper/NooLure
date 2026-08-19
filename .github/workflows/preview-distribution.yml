@@ -4,7 +4,7 @@ on:
     branches:
       - preview
 permissions:
-  contents: read
+  contents: write
 
 env:
   FIREBASE_TESTER_GROUP: "preview"
@@ -15,6 +15,46 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine next semantic version
+        run: |
+          git fetch --tags --force
+          LAST_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
+          if [ -z "$LAST_TAG" ]; then
+            BASE_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d+ -f1)
+            LAST_TAG="v$BASE_VERSION"
+            RANGE=""
+          else
+            RANGE="$LAST_TAG..HEAD"
+          fi
+          echo "Base tag: $LAST_TAG"
+
+          COMMITS=$(git log $RANGE --pretty=format:%s 2>/dev/null || true)
+          BUMP=patch
+          if echo "$COMMITS" | grep -qE '^[a-z]+(\(.+\))?!:|BREAKING CHANGE'; then
+            BUMP=major
+          elif echo "$COMMITS" | grep -qE '^feat(\(.+\))?:'; then
+            BUMP=minor
+          fi
+          echo "Bump type: $BUMP"
+
+          BASE="${LAST_TAG#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+          case "$BUMP" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+          VERSION_NAME="$MAJOR.$MINOR.$PATCH"
+          echo "Next version: $VERSION_NAME"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION_NAME" -m "Release v$VERSION_NAME"
+          git push origin "v$VERSION_NAME"
 
       - name: Verify applicationId is a valid reverse-domain identifier
         run: |
@@ -84,7 +124,16 @@ jobs:
           } > android/key.properties
 
       - name: Build signed release APK
-        run: flutter build apk --release --build-number=${{ github.run_number }}
+        run: |
+          flutter build apk --release \
+            --build-name="$VERSION_NAME" \
+            --build-number=${{ github.run_number }}
+
+      - name: Rename APK with semantic version
+        run: |
+          APK_PATH="build/app/outputs/flutter-apk/NooLure.v$VERSION_NAME.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "$APK_PATH"
+          echo "APK_PATH=$APK_PATH" >> "$GITHUB_ENV"
 
       - name: Install firebase-tools
         run: npm install -g firebase-tools@13
@@ -96,7 +145,7 @@ jobs:
           printf '%s' "$SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
 
-      - name: Build release notes (commit message + short SHA)
+      - name: Build release notes (version + commit message + short SHA)
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
@@ -104,7 +153,7 @@ jobs:
           DELIM="RELEASE_NOTES_EOF_$(date +%s%N)"
           {
             echo "RELEASE_NOTES<<$DELIM"
-            printf '%s (%s)\n' "$COMMIT_MESSAGE" "$SHORT_SHA"
+            printf 'v%s — %s (%s)\n' "$VERSION_NAME" "$COMMIT_MESSAGE" "$SHORT_SHA"
             echo "$DELIM"
           } >> "$GITHUB_ENV"
 
@@ -114,7 +163,32 @@ jobs:
           RELEASE_NOTES: ${{ env.RELEASE_NOTES }}
         run: |
           firebase appdistribution:distribute \
-            build/app/outputs/flutter-apk/app-release.apk \
+            "$APK_PATH" \
             --app "$FIREBASE_APP_ID" \
             --release-notes "$RELEASE_NOTES" \
             --groups "$FIREBASE_TESTER_GROUP"
+
+      - name: Publish release record to Firebase Realtime Database
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          RELEASE_NOTES: ${{ env.RELEASE_NOTES }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          RELEASED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          RECORD_PATH="$RUNNER_TEMP/release-record.json"
+          jq -n \
+            --arg version "$VERSION_NAME" \
+            --argjson buildNumber "$RUN_NUMBER" \
+            --arg apkFileName "NooLure.v$VERSION_NAME.apk" \
+            --arg commitSha "$SHORT_SHA" \
+            --arg releaseNotes "$RELEASE_NOTES" \
+            --arg releasedAt "$RELEASED_AT" \
+            '{version: $version, buildNumber: $buildNumber, apkFileName: $apkFileName, commitSha: $commitSha, releaseNotes: $releaseNotes, releasedAt: $releasedAt}' \
+            > "$RECORD_PATH"
+
+          VERSION_KEY=$(echo "$VERSION_NAME" | tr '.' '_')
+          firebase database:set "/appReleases/$VERSION_KEY" "$RECORD_PATH" \
+            --project "$FIREBASE_PROJECT_ID" -y
+          firebase database:set "/appMeta/latestVersion" "$RECORD_PATH" \
+            --project "$FIREBASE_PROJECT_ID" -y

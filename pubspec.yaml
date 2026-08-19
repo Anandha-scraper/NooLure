@@ -23,6 +23,7 @@ dependencies:
   firebase_auth: ^5.7.0
   cryptography: ^2.7.0
   url_launcher: ^6.3.0
+  package_info_plus: ^8.1.2
 
 # jni is a transitive dependency (pulled in by google_sign_in_android and
 # firebase_database) under a bare `^1.0.0` constraint. 1.0.1's android/build.gradle
