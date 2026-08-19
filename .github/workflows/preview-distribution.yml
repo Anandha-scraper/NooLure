@@ -59,7 +59,7 @@ jobs:
           echo "$LOG_TEXT"
 
           BUMP="patch"
-          if echo "$LOG_TEXT" | grep -qiE 'BREAKING[ _-]CHANGE|^[a-zA-Z]+(\([^)]*\))?!:'; then
+          if echo "$LOG_TEXT" | grep -qE '^BREAKING CHANGE:|^[a-zA-Z]+(\([^)]*\))?!:'; then
             BUMP="major"
           elif echo "$LOG_TEXT" | grep -qE '^feat(\([^)]*\))?:'; then
             BUMP="minor"
