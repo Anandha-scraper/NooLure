@@ -25,4 +25,5 @@ class AppRoutes {
   static const String editPassword = '/passwords/edit';
   static const String profile = '/profile';
   static const String editProfile = '/profile/edit';
+  static const String about = '/profile/about';
 }
