@@ -10,6 +10,7 @@ import '../../screens/notes/notes_archive_screen.dart';
 import '../../screens/notes/notes_screen.dart';
 import '../../models/password_model.dart';
 import '../../screens/notes/notes_trash_screen.dart';
+import '../../screens/profile/about_screen.dart';
 import '../../screens/passwords/add_password_screen.dart';
 import '../../screens/passwords/passwords_screen.dart';
 import '../../screens/profile/edit_profile_screen.dart';
@@ -75,6 +76,8 @@ class RouteGenerator {
         return _page(const ProfileScreen());
       case AppRoutes.editProfile:
         return _page(const EditProfileScreen());
+      case AppRoutes.about:
+        return _page(const AboutScreen());
       case AppRoutes.passwords:
         return _page(const PasswordsScreen());
       case AppRoutes.addPassword:
