@@ -91,6 +91,16 @@ jobs:
           channel: stable
           cache: true
 
+      # Flutter's Gradle plugin is an included build with its own settings.
+      # Its plugin classpath otherwise searches only the Gradle Plugin Portal,
+      # which does not serve Kotlin 2.2.x transitive artifacts used by Flutter.
+      - name: Add Maven Central to Flutter Gradle plugin resolution
+        run: |
+          FLUTTER_GRADLE_SETTINGS="$FLUTTER_ROOT/packages/flutter_tools/gradle/settings.gradle.kts"
+          if ! grep -q '^pluginManagement' "$FLUTTER_GRADLE_SETTINGS"; then
+            sed -i '1i pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' "$FLUTTER_GRADLE_SETTINGS"
+          fi
+
       - name: Cache Gradle dependencies
         uses: actions/cache@v4
         with:
