@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../core/theme/text_styles.dart';
 import '../core/utils/boldify_text.dart';
-import '../core/utils/note_body_formatting.dart';
 import '../models/note_model.dart';
 import '../providers/note_provider.dart';
 import 'tag_chip.dart';
@@ -109,54 +108,39 @@ class _NotePreviewSheet extends StatelessWidget {
                                 color: theme.colorScheme.primary,
                                 decoration: TextDecoration.underline,
                               ),
-                              onToggleChecklist: (lineStartOffset) {
-                                final result = toggleChecklistAtOffset(
-                                  liveNote.body,
-                                  lineStartOffset,
-                                );
-                                if (result == null) return;
-                                context.read<NoteProvider>().updateNote(
-                                  liveNote.copyWith(body: result.body),
-                                );
-                              },
                             ),
                           ),
                         ),
                       if (liveNote.checklist.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         for (final item in liveNote.checklist)
-                          GestureDetector(
-                            onTap: () => context
-                                .read<NoteProvider>()
-                                .toggleChecklistItem(liveNote.id, item.id),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 3),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    item.done
-                                        ? LucideIcons.checkSquare
-                                        : LucideIcons.square,
-                                    size: 15,
-                                    color: onSurface.withValues(alpha: 0.6),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      item.title,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: onSurface.withValues(
-                                          alpha: item.done ? 0.5 : 0.85,
-                                        ),
-                                        decoration: item.done
-                                            ? TextDecoration.lineThrough
-                                            : null,
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  item.done
+                                      ? LucideIcons.checkSquare
+                                      : LucideIcons.square,
+                                  size: 15,
+                                  color: onSurface.withValues(alpha: 0.6),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    item.title,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: onSurface.withValues(
+                                        alpha: item.done ? 0.5 : 0.85,
                                       ),
+                                      decoration: item.done
+                                          ? TextDecoration.lineThrough
+                                          : null,
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
                       ],
@@ -173,7 +157,9 @@ class _NotePreviewSheet extends StatelessWidget {
                     icon: Icon(
                       LucideIcons.pin,
                       size: 16,
-                      color: liveNote.isPinned ? theme.colorScheme.primary : null,
+                      color: liveNote.isPinned
+                          ? theme.colorScheme.primary
+                          : null,
                     ),
                     label: Text(liveNote.isPinned ? 'Unpin' : 'Pin'),
                   ),

@@ -6,21 +6,43 @@ import 'text_styles.dart';
 class AppTheme {
   AppTheme._();
 
-  static ThemeData light({Color accentSeed = AppColors.accent}) =>
-      _build(brightness: Brightness.light, accentSeed: accentSeed);
+  static ThemeData light({
+    Color accentSeed = AppColors.accent,
+    Map<String, Color> colors = const {},
+  }) => _build(
+    brightness: Brightness.light,
+    accentSeed: accentSeed,
+    colors: colors,
+  );
 
-  static ThemeData dark({Color accentSeed = AppColors.accent}) =>
-      _build(brightness: Brightness.dark, accentSeed: accentSeed);
+  static ThemeData dark({
+    Color accentSeed = AppColors.accent,
+    Map<String, Color> colors = const {},
+  }) => _build(
+    brightness: Brightness.dark,
+    accentSeed: accentSeed,
+    colors: colors,
+  );
 
   static ThemeData _build({
     required Brightness brightness,
     required Color accentSeed,
+    required Map<String, Color> colors,
   }) {
     final isDark = brightness == Brightness.dark;
-    final bg = isDark ? AppColors.darkBg : AppColors.bg;
-    final surface = isDark ? AppColors.darkSurface : AppColors.surface;
-    final onSurface = isDark ? AppColors.darkText : AppColors.text;
-    final divider = isDark ? AppColors.darkDivider : AppColors.divider;
+    Color custom(String role, Color fallback) =>
+        colors['${brightness.name}_$role'] ?? fallback;
+    final bg = custom('background', isDark ? AppColors.darkBg : AppColors.bg);
+    final surface = custom(
+      'surface',
+      isDark ? AppColors.darkSurface : AppColors.surface,
+    );
+    final onSurface = custom(
+      'text',
+      isDark ? AppColors.darkText : AppColors.text,
+    );
+    final divider = onSurface.withValues(alpha: 0.16);
+    accentSeed = custom('accent', accentSeed);
 
     final colorScheme = ColorScheme(
       brightness: brightness,

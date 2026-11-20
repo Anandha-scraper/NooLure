@@ -164,29 +164,13 @@ class ProfileScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                Text(
-                  'Accent · Organic default',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: onSurface.withValues(alpha: 0.5),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _AccentSwatch(
-                      color: AppColors.accent,
-                      selected: themeProvider.accentSeed == AppColors.accent,
-                      onTap: () => themeProvider.setAccent(AppColors.accent),
-                    ),
-                    const SizedBox(width: 10),
-                    _AccentSwatch(
-                      color: AppColors.accent2,
-                      selected: themeProvider.accentSeed == AppColors.accent2,
-                      onTap: () => themeProvider.setAccent(AppColors.accent2),
-                    ),
-                  ],
-                ),
+                for (final role in const [
+                  'background',
+                  'surface',
+                  'text',
+                  'accent',
+                ])
+                  _ColorRolePicker(role: role, provider: themeProvider),
               ],
             ),
           ),
@@ -237,9 +221,7 @@ class ProfileScreen extends StatelessWidget {
               if (!signedOut) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(
-                      auth.errorMessage ?? 'Could not sign out',
-                    ),
+                    content: Text(auth.errorMessage ?? 'Could not sign out'),
                   ),
                 );
                 return;
@@ -398,6 +380,69 @@ class _AccentSwatch extends StatelessWidget {
               ? [BoxShadow(color: color, blurRadius: 0, spreadRadius: 1.5)]
               : null,
         ),
+      ),
+    );
+  }
+}
+
+class _ColorRolePicker extends StatelessWidget {
+  const _ColorRolePicker({required this.role, required this.provider});
+  final String role;
+  final ThemeProvider provider;
+
+  static const options = <Color>[
+    Color(0xFFF8E1B7),
+    Color(0xFFCBB896),
+    Color(0xFF2E2010),
+    Color(0xFFCBA35C),
+    Color(0xFF8CA592),
+    Color(0xFFDEE9F2),
+    Color(0xFFCAD7EE),
+    Color(0xFF23354B),
+    Color(0xFF4769A1),
+    Color(0xFFF0DDE5),
+    Color(0xFF653348),
+    Color(0xFFAB5476),
+    Color(0xFFFAF8F4),
+    Color(0xFF29232B),
+    Color(0xFFEEE6DC),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(role[0].toUpperCase() + role.substring(1)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final color in options)
+                _AccentSwatch(
+                  color: color,
+                  selected:
+                      provider.customColors['${brightness.name}_$role'] ==
+                      color,
+                  onTap: () {
+                    if (!provider.setColor(role, color, brightness)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Choose colors with stronger contrast for readable text and controls.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

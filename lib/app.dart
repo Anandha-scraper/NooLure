@@ -35,8 +35,14 @@ class NooLureApp extends StatelessWidget {
           return MaterialApp(
             title: 'NooLure',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.light(accentSeed: themeProvider.accentSeed),
-            darkTheme: AppTheme.dark(accentSeed: themeProvider.accentSeed),
+            theme: AppTheme.light(
+              accentSeed: themeProvider.accentSeed,
+              colors: themeProvider.customColors,
+            ),
+            darkTheme: AppTheme.dark(
+              accentSeed: themeProvider.accentSeed,
+              colors: themeProvider.customColors,
+            ),
             themeMode: themeProvider.mode,
             navigatorObservers: [appRouteObserver],
             onGenerateRoute: RouteGenerator.generateRoute,

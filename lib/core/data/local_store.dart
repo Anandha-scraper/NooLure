@@ -15,6 +15,9 @@ class LocalStore {
   static const String birthdays = 'birthdays';
   static const String passwords = 'passwords';
   static const String passwordVault = 'passwordVault';
+  static const String pendingSync = 'pendingSync';
+  static const String tripCache = 'tripCache';
+  static const String syncSeen = 'syncSeen';
 
   static const List<String> collections = [
     tasks,
@@ -27,6 +30,9 @@ class LocalStore {
   static Future<void> init() async {
     await Hive.initFlutter();
     await Future.wait(collections.map(Hive.openBox<String>));
+    await Hive.openBox<String>(pendingSync);
+    await Hive.openBox<String>(tripCache);
+    await Hive.openBox<String>(syncSeen);
   }
 
   static Box<String> box(String collection) => Hive.box<String>(collection);
@@ -36,5 +42,8 @@ class LocalStore {
     for (final collection in collections) {
       await box(collection).clear();
     }
+    await box(pendingSync).clear();
+    await box(tripCache).clear();
+    await box(syncSeen).clear();
   }
 }

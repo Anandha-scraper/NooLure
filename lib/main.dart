@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'app.dart';
@@ -15,7 +17,6 @@ Future<void> main() async {
 
   // Best-effort Firebase mirror. With no Firebase config in the project this
   // quietly no-ops and the app runs entirely on-device; see SyncService.
-  await SyncService.instance.init();
-
   runApp(const NooLureApp());
+  unawaited(SyncService.instance.init());
 }

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../core/data/repositories.dart';
 import '../core/data/repository.dart';
 import '../core/security/vault_crypto.dart';
+import '../core/security/biometric_vault.dart';
 import '../models/password_model.dart';
 import '../models/password_vault_model.dart';
 
@@ -111,6 +112,30 @@ class PasswordProvider extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> get biometricAvailable => BiometricVault.available;
+  Future<bool> get biometricEnabled => BiometricVault.enabled;
+
+  Future<void> enableBiometric() async {
+    final key = _key;
+    final vault = _vault;
+    if (key == null || vault == null || !await BiometricVault.available) return;
+    await BiometricVault.enable(await key.extractBytes(), vault.canaryBase64);
+    notifyListeners();
+  }
+
+  Future<bool> unlockBiometric() async {
+    final vault = _vault;
+    if (vault == null) return false;
+    final bytes = await BiometricVault.read(vault.canaryBase64);
+    if (bytes == null) return false;
+    final key = SecretKey(bytes);
+    if (!await VaultCrypto.verifyCanary(vault.canaryBase64, key)) return false;
+    _key = key;
+    await _redecryptAll();
+    notifyListeners();
+    return true;
+  }
+
   void lock() {
     if (isLocked) return;
     _key = null;
@@ -122,6 +147,7 @@ class PasswordProvider extends ChangeNotifier {
   /// way to recover, and destructive by design, since nothing but the PIN
   /// can reconstruct the key that encrypted the old entries anyway.
   Future<void> resetVault() async {
+    await BiometricVault.disable();
     for (final entry in _repository.all()) {
       await _repository.delete(entry.id);
     }
