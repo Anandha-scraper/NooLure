@@ -29,7 +29,6 @@ class _PasswordsScreenState extends State<PasswordsScreen> {
   String _firstPin = '';
   int _errorTick = 0;
 
-
   @override
   void dispose() {
     // Leaving the section — always re-lock, whether via back or the drawer.
@@ -51,7 +50,8 @@ class _PasswordsScreenState extends State<PasswordsScreen> {
           : _buildList(context, provider),
       floatingActionButton: provider.hasVault && !provider.isLocked
           ? AppFab(
-              onPressed: () => Navigator.of(context).pushNamed(AppRoutes.addPassword),
+              onPressed: () =>
+                  Navigator.of(context).pushNamed(AppRoutes.addPassword),
             )
           : null,
     );
@@ -100,7 +100,10 @@ class _PasswordsScreenState extends State<PasswordsScreen> {
               const SizedBox(height: 16),
               Text(
                 _pinError!,
-                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.error),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.error,
+                ),
               ),
             ],
           ],
@@ -150,12 +153,35 @@ class _PasswordsScreenState extends State<PasswordsScreen> {
             const SizedBox(height: 16),
             Text('Enter your PIN', style: TextStyles.h4(color: onSurface)),
             const SizedBox(height: 28),
-            PinKeypad(errorTick: _errorTick, onComplete: (digits) => _handleUnlock(digits, provider)),
+            PinKeypad(
+              errorTick: _errorTick,
+              onComplete: (digits) => _handleUnlock(digits, provider),
+            ),
+            FutureBuilder<bool>(
+              future: provider.biometricEnabled,
+              builder: (context, snapshot) => snapshot.data == true
+                  ? TextButton.icon(
+                      onPressed: () async {
+                        final ok = await provider.unlockBiometric();
+                        if (mounted && !ok)
+                          setState(
+                            () => _pinError =
+                                'Biometric unlock unavailable. Use your PIN.',
+                          );
+                      },
+                      icon: const Icon(LucideIcons.fingerprint),
+                      label: const Text('Unlock with fingerprint'),
+                    )
+                  : const SizedBox.shrink(),
+            ),
             if (_pinError != null) ...[
               const SizedBox(height: 16),
               Text(
                 _pinError!,
-                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.error),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.error,
+                ),
               ),
             ],
             const SizedBox(height: 20),
@@ -226,6 +252,34 @@ class _PasswordsScreenState extends State<PasswordsScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
       children: [
+        FutureBuilder<bool>(
+          future: provider.biometricAvailable,
+          builder: (context, available) => available.data == true
+              ? FutureBuilder<bool>(
+                  future: provider.biometricEnabled,
+                  builder: (context, enabled) => enabled.data == true
+                      ? const SizedBox.shrink()
+                      : TextButton.icon(
+                          icon: const Icon(LucideIcons.fingerprint),
+                          label: const Text('Enable fingerprint unlock'),
+                          onPressed: () async {
+                            try {
+                              await provider.enableBiometric();
+                            } catch (_) {
+                              if (context.mounted)
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Could not enable biometrics. Your PIN still works.',
+                                    ),
+                                  ),
+                                );
+                            }
+                          },
+                        ),
+                )
+              : const SizedBox.shrink(),
+        ),
         SizedBox(
           height: 30,
           child: ListView.separated(
@@ -290,7 +344,10 @@ class _SecurityExplainer extends StatelessWidget {
 
   static const _steps = [
     (LucideIcons.keyRound, 'You choose a 4-digit PIN'),
-    (LucideIcons.shieldCheck, "That key locks every password before it's ever saved."),
+    (
+      LucideIcons.shieldCheck,
+      "That key locks every password before it's ever saved.",
+    ),
     (
       LucideIcons.cloudOff,
       'Only the locked version is ever backed up , never the real password.',
@@ -301,7 +358,10 @@ class _SecurityExplainer extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    final ink = AppColors.accentInk(theme.colorScheme.primary, theme.brightness);
+    final ink = AppColors.accentInk(
+      theme.colorScheme.primary,
+      theme.brightness,
+    );
 
     return CardContainer(
       elevation: CardElevation.sm,

@@ -2,6 +2,7 @@
     <!-- Required for Firebase Auth, the Realtime Database mirror, and Google
          Sign-In, all of which need network access. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <application
         android:label="NooLure"
         android:name="${applicationName}"

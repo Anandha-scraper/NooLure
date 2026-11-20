@@ -24,7 +24,7 @@ const _features = [
   _Feature(
     LucideIcons.notebook,
     'Notes',
-    'Quick capture with checklists, formatting and search.',
+    'Quick capture with notes and search.',
   ),
   _Feature(
     LucideIcons.cake,
@@ -108,7 +108,10 @@ class AboutScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(feature.title, style: TextStyles.cardTitle(context)),
+                        Text(
+                          feature.title,
+                          style: TextStyles.cardTitle(context),
+                        ),
                         const SizedBox(height: 2),
                         Text(
                           feature.description,

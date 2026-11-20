@@ -93,6 +93,8 @@ class Repository<T> {
     if (stale.isNotEmpty) await _box.deleteAll(stale);
   }
 
+  Future<void> removeLocal(String id) => _box.delete(id);
+
   T? _decode(String raw) {
     try {
       return fromJson(jsonDecode(raw) as Map<String, dynamic>);
