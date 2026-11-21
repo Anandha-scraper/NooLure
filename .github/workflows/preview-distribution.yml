@@ -122,4 +122,5 @@ jobs:
           firebase appdistribution:distribute "$APK_PATH" \
             --app "$FIREBASE_APP_ID" \
             --groups "$FIREBASE_TESTER_GROUP" \
-            --release-notes "$notes"
+            --release-notes "$notes" 2>&1 \
+            | sed -E 's#https?://[^[:space:]]+#[link omitted]#g'
