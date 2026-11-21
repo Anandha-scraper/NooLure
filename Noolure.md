@@ -6,20 +6,18 @@ This document explains, in plain language, how a new version of the NooLure Andr
 
 ## 1. The Simple Version
 
-> Every time approved code is merged into the **`preview`** branch on GitHub, a robot (GitHub Actions) automatically builds the Android app, signs it, and sends it to testers via Firebase App Distribution — no human has to build or upload anything by hand.
+Every push to **`preview`** or **`main`** starts a signed Android build. A successful build is sent to the existing Firebase App Distribution **`preview`** tester group. The Actions page also offers a manual run for the latest commit on either branch.
 
 ```mermaid
 flowchart TD
-    A[Developer pushes code to main] --> B[Open a Pull Request: main into preview]
-    B --> C[Pull Request merged into preview]
-    C --> D[GitHub Actions robot wakes up]
+    A[Push or merge into preview or main] --> D[GitHub Actions starts]
     D --> E[Builds the Android app - APK]
     E --> F[Signs it with the app's release key]
     F --> G[Uploads it to Firebase App Distribution]
     G --> H[Testers get an email with a download link]
 ```
 
-Total time from "merge" to "testers notified": roughly 5–10 minutes.
+Build time varies with dependency downloads and the GitHub runner queue.
 
 ---
 
@@ -27,7 +25,7 @@ Total time from "merge" to "testers notified": roughly 5–10 minutes.
 
 1. Go to the GitHub repository page.
 2. Click the **Actions** tab at the top.
-3. You'll see a list of runs. Look for **"Preview Distribution"**.
+3. You'll see a list of runs. Look for **"Android Firebase Distribution"**.
    - 🟡 Yellow dot = still running
    - ✅ Green check = success — testers will get the app shortly
    - ❌ Red X = it failed — see Section 5 below
@@ -38,13 +36,11 @@ You don't need to click into anything technical — the colored icon tells you e
 
 ## 3. How To Actually Ship a New Build (Step by Step)
 
-1. Make your code changes and push them to the **`main`** branch as usual.
-2. On GitHub, open a **Pull Request** with:
-   - Base branch: `preview`
-   - Compare branch: `main`
-3. Review it, then click **Merge Pull Request**.
-4. That's it. The robot takes over automatically — go watch the **Actions** tab if you're curious.
-5. Once it turns green, check your email (or the Firebase App Distribution page) for the new build.
+1. Push or merge your changes into **`preview`** or **`main`**.
+2. Watch the **Actions** tab for that branch's build.
+3. Once it turns green, check your email or the Firebase App Distribution page for the new build.
+
+To rebuild the latest commit without a new push, open **Actions → Android Firebase Distribution → Run workflow**, then select `preview` or `main`.
 
 You never need to manually create an APK or upload anything anywhere — if you're doing that by hand, something is wrong.
 
@@ -88,7 +84,7 @@ Don't panic — click into the failed run and look at which step has the ❌. He
 | "`applicationId ... is not a valid ...`" | Someone changed the app's package name incorrectly in the Android project | Ask a developer to check `android/app/build.gradle.kts` |
 | Failure during "Build signed release APK" | Usually an actual code/compilation problem, or a wrong password stored in secrets | Needs a developer to read the error and fix the code, or double-check the keystore passwords |
 | Failure during "Distribute to Firebase App Distribution" | The Firebase robot account (`FIREBASE_SERVICE_ACCOUNT`) may have lost permission, or expired | A developer needs to regenerate the service account key in Google Cloud Console and update the secret |
-| No run shows up at all after merging | The merge might not have actually gone into the `preview` branch, or Actions might be disabled for the repo | Confirm the PR target branch was `preview`, and check repo Settings → Actions is enabled |
+| No run shows up after a push | The push might not have gone into `preview` or `main`, or Actions might be disabled | Confirm the branch and check repo Settings → Actions is enabled |
 
 **If you're not technical and something fails:** take a screenshot of the red ❌ screen in the Actions tab and send it to a developer — that alone is usually enough for them to diagnose it in minutes.
 
@@ -100,25 +96,22 @@ In order, here's what the robot does every time, translated to plain English:
 
 1. **Checkout** – downloads a fresh copy of the code.
 2. **Verify applicationId** – double-checks the app's internal name is written correctly (fails fast if not, before wasting time building).
-3. **Set up JDK 17 / Set up Flutter** – installs the programming tools needed to build an Android app.
+3. **Set up JDK 17 / Set up Flutter** – installs the pinned tools needed to build the Android app.
 4. **Cache Gradle dependencies** – reuses previously-downloaded build tools instead of re-downloading them every time, which speeds things up.
-5. **Install Dart/Flutter dependencies** – downloads the app's building blocks (packages/libraries).
+5. **Install Flutter dependencies / Check Dart code** – downloads packages and checks the source.
 6. **Decode Firebase config / Decode release keystore** – unlocks the secrets from Section 4 so the app can be built and signed.
 7. **Write key.properties** – prepares the signing instructions for the build tool.
 8. **Build signed release APK** – actually compiles and signs the Android app file.
 9. **Install firebase-tools / Authenticate** – installs and logs into the tool that talks to Firebase App Distribution.
-10. **Build release notes** – automatically writes "what's in this build" using your commit message.
-11. **Distribute to Firebase App Distribution** – uploads the finished app and notifies the `preview` tester group by email.
+10. **Distribute to Firebase App Distribution** – uploads the finished app with branch and commit details and notifies the `preview` tester group by email.
 
 ---
 
-## 7. Recent Speed Improvements
+## 7. Build Version and History
 
-The pipeline was recently reviewed and trimmed to build faster:
+The app version is set in `pubspec.yaml` (`1.2.0`). Each workflow run uses its unique run number as the Android version code, so testers can install newer builds. Update the app version in `pubspec.yaml` when releasing a new feature version. Successful and failed Actions runs are retained for troubleshooting.
 
-- ❌ **Removed**: an old "delete previous releases before uploading" cleanup step. It was silently failing anyway (a CLI version mismatch), and it never affected whether new builds reached testers — it only tried to tidy up old builds in Firebase App Distribution. Old builds will now simply accumulate there; they can be deleted manually and occasionally from the Firebase Console if the list gets long.
-- ❌ **Removed**: verbose (`-v`) build logging, which only made logs longer without adding value once the pipeline was confirmed working.
-- ✅ **Added**: Gradle dependency caching, so repeated builds don't have to re-download the same Android build tools every single time — this is typically the biggest time-saver for Android CI builds.
+Gradle and Flutter caches reduce repeated downloads. Old Firebase releases remain available until they expire under Firebase App Distribution's retention policy.
 
 ---
 
@@ -127,7 +120,7 @@ The pipeline was recently reviewed and trimmed to build faster:
 | Question | Answer |
 |---|---|
 | Where do I watch a build? | GitHub → **Actions** tab |
-| How do I trigger a build? | Merge a Pull Request from `main` into `preview` |
+| How do I trigger a build? | Push to `preview` or `main`, or use **Run workflow** in Actions |
 | Where do testers get the app? | Email from Firebase App Distribution (group: `preview`) |
 | Where are the secrets stored? | GitHub → **Settings → Secrets and variables → Actions** |
 | Can I see secret values again? | No — GitHub only lets you replace them, never view them |
