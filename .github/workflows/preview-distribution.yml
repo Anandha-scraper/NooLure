@@ -7,10 +7,11 @@ on:
 
 permissions:
   contents: read
+  actions: write # remove older completed runs after a successful distribution
 
 concurrency:
-  group: android-firebase-${{ github.ref }}
-  cancel-in-progress: true
+  group: android-firebase-distribution
+  cancel-in-progress: false
 
 jobs:
   build-and-distribute:
@@ -104,8 +105,8 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install Firebase CLI
-        run: npm install --global firebase-tools@15.37.0
+      - name: Install Firebase CLI and API authentication
+        run: npm install --global firebase-tools@15.37.0 google-auth-library@9.15.1
 
       - name: Distribute APK to Firebase testers
         env:
@@ -124,3 +125,26 @@ jobs:
             --groups "$FIREBASE_TESTER_GROUP" \
             --release-notes "$notes" 2>&1 \
             | sed -E 's#https?://[^[:space:]]+#[link omitted]#g'
+
+      - name: Keep the newest five Firebase APKs
+        env:
+          FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+        run: |
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-service-account.json"
+          NODE_PATH="$(npm root --global)" node scripts/prune_firebase_releases.js
+
+      # Runs are serialized across branches, so this never removes a concurrent build.
+      - name: Keep only this successful Actions run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          runs=$(gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/preview-distribution.yml/runs?per_page=100" \
+            --jq '.workflow_runs[] | select(.status == "completed") | .id')
+          while IFS= read -r run_id; do
+            if [ -n "$run_id" ] && [ "$run_id" != "$GITHUB_RUN_ID" ]; then
+              gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/runs/$run_id"
+              echo "Deleted older Actions run $run_id"
+            fi
+          done <<< "$runs"

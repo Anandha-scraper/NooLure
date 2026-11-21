@@ -109,9 +109,9 @@ In order, here's what the robot does every time, translated to plain English:
 
 ## 7. Build Version and History
 
-The app version is set in `pubspec.yaml` (`1.2.0`). Each workflow run uses its unique run number as the Android version code, so testers can install newer builds. Update the app version in `pubspec.yaml` when releasing a new feature version. Successful and failed Actions runs are retained for troubleshooting.
+The app version is set in `pubspec.yaml` (`1.2.0`). Each workflow run uses its unique run number as the Android version code, so testers can install newer builds. Update the app version in `pubspec.yaml` when releasing a new feature version.
 
-Gradle and Flutter caches reduce repeated downloads. Old Firebase releases remain available until they expire under Firebase App Distribution's retention policy.
+After a successful upload, the workflow keeps the newest five Firebase APK releases and deletes older ones. It then removes older completed Actions runs, leaving the current successful run. A failed run remains visible for diagnosis until a later successful run cleans it up. Builds from `preview` and `main` run one at a time so their cleanup steps cannot race. Gradle and Flutter caches reduce repeated downloads.
 
 ---
 
